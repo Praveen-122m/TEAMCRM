@@ -1,89 +1,102 @@
+const onlineUsers = new Map(); // userId -> socketId
+
 const socketHandler = (io) => {
   io.on('connection', (socket) => {
-    console.log('User connected:', socket.id);
+    console.log('[SOCKET] Connected:', socket.id);
 
-    // Setup user-specific room for DMs
+    // Setup user-specific room for DMs and Call Notifications
     socket.on('setup', (userData) => {
       if (userData && userData._id) {
-        socket.join(userData._id.toString());
-        console.log('User joined private room:', userData._id);
+        const userId = userData._id.toString();
+        socket.join(userId);
+        
+        // Join workspace rooms for announcements
+        if (userData.workspaces && Array.isArray(userData.workspaces)) {
+          userData.workspaces.forEach(wsId => {
+            socket.join(wsId.toString());
+            if (userData.role?.toLowerCase() === 'admin') {
+              socket.join(`admin_${wsId.toString()}`);
+            }
+          });
+        }
+        
+        // Track online status
+        onlineUsers.set(userId, socket.id);
+        socket.userId = userId; 
+        
+        console.log('[SOCKET] User joined private room:', userId);
+        socket.broadcast.emit('user_online', userId);
+        socket.emit('get_online_users', Array.from(onlineUsers.keys()));
         socket.emit('connected');
       }
     });
 
-    // Join channel room
     socket.on('join_channel', (channelId) => {
+      if (!channelId) return;
       socket.join(channelId.toString());
-      console.log('User joined channel room:', channelId);
+      console.log('[SOCKET] User joined channel:', channelId);
     });
 
-    // Leave channel room
-    socket.on('leave_channel', (channelId) => {
-      socket.leave(channelId.toString());
-      console.log('User left channel room:', channelId);
-    });
-
-    // Global message handler (Handles both Channels and DMs)
     socket.on('new_message', (newMessageReceived) => {
-      const channel = newMessageReceived.channel?.toString();
-      const receiverId = (newMessageReceived.receiver?._id || newMessageReceived.receiver)?.toString();
-      const senderId = (newMessageReceived.sender?._id || newMessageReceived.sender)?.toString();
+      const channelId = newMessageReceived.channelId || newMessageReceived.channel?._id || newMessageReceived.channel;
+      const receiverId = newMessageReceived.receiverId || newMessageReceived.receiver?._id || newMessageReceived.receiver;
+      const content = newMessageReceived.content || '';
 
-      if (channel) {
-        socket.in(channel).emit('message_received', newMessageReceived);
-        console.log(`[REALTIME] Channel Message in ${channel}`);
+      if (channelId) {
+        // Broadcast to channel
+        socket.in(channelId.toString()).emit('message_received', newMessageReceived);
+
+        // --- SMART MENTION DETECTION ---
+        // Check if anyone is mentioned using @Name pattern (supports multiple words)
+        const mentionMatch = content.match(/@([\w\s]+?)(?=\s|$)/g);
+        if (mentionMatch) {
+          mentionMatch.forEach(mention => {
+            const mentionedName = mention.substring(1).trim(); 
+            // Broadcast to all clients; frontend will check if mentionedName matches user.name
+            io.emit('mention_detected', {
+                ...newMessageReceived,
+                mentionedName: mentionedName
+            });
+          });
+        }
       } else if (receiverId) {
-        // WhatsApp Style: Send to both Sender's rooms and Receiver's rooms
-        // This ensures all open windows for BOTH users update instantly
-        io.to(receiverId).to(senderId).emit('message_received', newMessageReceived);
-        console.log(`[REALTIME] DM from ${senderId} to ${receiverId}`);
+        // Direct Message
+        io.to(receiverId.toString()).emit('message_received', newMessageReceived);
       }
     });
 
-    // Typing Indicators
-    socket.on('typing', (data) => {
-      const room = data.room || data;
-      socket.in(room.toString()).emit('typing', data);
-    });
-    socket.on('stop_typing', (data) => {
-      const room = data.room || data;
-      socket.in(room.toString()).emit('stop_typing', data);
-    });
-
-    // --- CALL SIGNALING ---
+    // Call Signaling
     socket.on('call_request', (data) => {
-      // data: { from: senderObj, toId: receiverId, roomId: string }
-      io.to(data.toId).emit('incoming_call', {
-        from: data.from,
-        roomId: data.roomId
-      });
-      console.log(`[CALL] Request from ${data.from.name} to ${data.toId}`);
+      if (!data.toId) return;
+      io.to(data.toId.toString()).emit('incoming_call', { from: data.from, roomId: data.roomId });
     });
 
     socket.on('call_accepted', (data) => {
-      // data: { toId: callerId, roomId: string }
-      io.to(data.toId).emit('call_joined', { roomId: data.roomId });
-      console.log(`[CALL] Accepted by ${socket.id} for room ${data.roomId}`);
+      if (!data.toId) return;
+      io.to(data.toId.toString()).emit('call_joined', { roomId: data.roomId });
     });
 
     socket.on('call_rejected', (data) => {
-      // data: { toId: callerId }
-      io.to(data.toId).emit('call_busy');
-      console.log(`[CALL] Rejected by ${socket.id}`);
+      if (!data.toId) return;
+      io.to(data.toId.toString()).emit('call_busy');
     });
 
-    // Deletion Handler
-    socket.on('delete_message', (data) => {
-      if (data.channelId) {
-        socket.in(data.channelId.toString()).emit('message_deleted', data);
-      } else if (data.receiverId) {
-        io.to(data.receiverId.toString()).to(data.senderId.toString()).emit('message_deleted', data);
+    // Typing Indicators
+    socket.on('typing', (room) => {
+      if (!room) return;
+      socket.in(room.toString()).emit('typing', room);
+    });
+
+    socket.on('stop_typing', (room) => {
+      if (!room) return;
+      socket.in(room.toString()).emit('stop_typing', room);
+    });
+
+    socket.on('disconnect', () => {
+      if (socket.userId) {
+        onlineUsers.delete(socket.userId);
+        io.emit('user_offline', socket.userId);
       }
-    });
-
-    socket.on('new_room_created', (data) => {
-      socket.broadcast.emit('room_created', data);
-      console.log(`[REALTIME] New Room Created: ${data.name}`);
     });
   });
 };

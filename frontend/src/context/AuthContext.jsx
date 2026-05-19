@@ -9,7 +9,7 @@ export const AuthProvider = ({ children }) => {
   const [loading, setLoading] = useState(true);
 
   // Configure axios base URL
-  axios.defaults.baseURL = 'http://localhost:5005';
+  axios.defaults.baseURL = import.meta.env.VITE_API_URL || 'http://localhost:5005';
 
   useEffect(() => {
     const userInfo = localStorage.getItem('userInfo');
@@ -18,11 +18,22 @@ export const AuthProvider = ({ children }) => {
       setUser(parsedUser);
       axios.defaults.headers.common['Authorization'] = `Bearer ${parsedUser.token}`;
       
-      // Load active workspace if not set
-      if (!activeWorkspace && parsedUser.workspaces?.length > 0) {
-        const defaultWp = parsedUser.workspaces[0];
-        setActiveWorkspaceState(defaultWp);
-        localStorage.setItem('activeWorkspace', defaultWp);
+      // Handle active workspace logic securely
+      if (parsedUser.workspaces?.length > 0) {
+        // If there's an activeWorkspace in cache, verify it still exists for this user
+        if (activeWorkspace && !parsedUser.workspaces.includes(activeWorkspace)) {
+          setActiveWorkspaceState(parsedUser.workspaces[0]);
+          localStorage.setItem('activeWorkspace', parsedUser.workspaces[0]);
+        } 
+        // If no active workspace is set, set the first one
+        else if (!activeWorkspace) {
+          setActiveWorkspaceState(parsedUser.workspaces[0]);
+          localStorage.setItem('activeWorkspace', parsedUser.workspaces[0]);
+        }
+      } else {
+        // If user has no workspaces, clear the cache
+        setActiveWorkspaceState(null);
+        localStorage.removeItem('activeWorkspace');
       }
     }
     setLoading(false);
@@ -61,7 +72,7 @@ export const AuthProvider = ({ children }) => {
 
   const refreshUser = async () => {
     try {
-      const { data } = await axios.get('/api/users/profile');
+      const { data } = await axios.get('/api/auth/profile');
       // Merge new data with existing token
       const updatedUser = { ...user, ...data };
       setUser(updatedUser);
@@ -79,7 +90,7 @@ export const AuthProvider = ({ children }) => {
   };
 
   return (
-    <AuthContext.Provider value={{ user, login, register, logout, refreshUser, activeWorkspace, setActiveWorkspace, loading }}>
+    <AuthContext.Provider value={{ user, setUser, login, register, logout, refreshUser, activeWorkspace, setActiveWorkspace, loading }}>
       {children}
     </AuthContext.Provider>
   );

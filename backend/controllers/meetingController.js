@@ -1,4 +1,6 @@
 const Meeting = require('../models/Meeting');
+const User = require('../models/User');
+const { Op } = require('sequelize');
 
 // @desc    Create a new meeting room
 // @route   POST /api/meetings
@@ -13,8 +15,8 @@ const createMeeting = async (req, res) => {
     const meeting = await Meeting.create({
       name,
       description,
-      workspace: workspaceId,
-      createdBy: req.user._id,
+      workspaceId,
+      createdById: req.user._id,
       roomId,
       scheduledAt: scheduledAt || new Date(),
       status: scheduledAt ? 'Scheduled' : 'Active'
@@ -22,6 +24,7 @@ const createMeeting = async (req, res) => {
 
     res.status(201).json(meeting);
   } catch (error) {
+    console.error('[CREATE_MEETING_ERR]', error);
     res.status(500).json({ message: 'Server Error', error: error.message });
   }
 };
@@ -31,14 +34,42 @@ const createMeeting = async (req, res) => {
 // @access  Private
 const getMeetings = async (req, res) => {
   try {
-    const meetings = await Meeting.find({ 
-      workspace: req.params.workspaceId,
-      status: { $in: ['Active', 'Scheduled'] } 
-    }).populate('createdBy', 'name profileImage').sort({ createdAt: -1 });
+    const meetings = await Meeting.findAll({ 
+      where: {
+        workspaceId: req.params.workspaceId,
+        status: { [Op.in]: ['Active', 'Scheduled'] } 
+      },
+      include: [
+        { model: User, as: 'createdBy', attributes: ['_id', 'name', 'profileImage'] }
+      ],
+      order: [['createdAt', 'DESC']]
+    });
     res.json(meetings);
   } catch (error) {
+    console.error('[GET_MEETINGS_ERR]', error);
     res.status(500).json({ message: 'Server Error', error: error.message });
   }
 };
 
-module.exports = { createMeeting, getMeetings };
+// @desc    Delete a meeting
+// @route   DELETE /api/meetings/:id
+// @access  Private
+const deleteMeeting = async (req, res) => {
+  try {
+    const meeting = await Meeting.findByPk(req.params.id);
+    if (!meeting) return res.status(404).json({ message: 'Meeting not found' });
+    
+    // Only creator or Admin can delete
+    if (meeting.createdById !== req.user._id && req.user.role?.toLowerCase() !== 'admin') {
+      return res.status(403).json({ message: 'Not authorized' });
+    }
+
+    await meeting.destroy();
+    res.json({ message: 'Meeting deleted' });
+  } catch (error) {
+    console.error('[DELETE_MEETING_ERR]', error);
+    res.status(500).json({ message: 'Server Error', error: error.message });
+  }
+};
+
+module.exports = { createMeeting, getMeetings, deleteMeeting };

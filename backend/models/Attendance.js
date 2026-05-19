@@ -1,13 +1,42 @@
-const mongoose = require('mongoose');
+const { DataTypes } = require('sequelize');
+const { sequelize } = require('../config/db');
 
-const attendanceSchema = new mongoose.Schema({
-  user: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  workspace: { type: mongoose.Schema.Types.ObjectId, ref: 'Workspace', required: true },
-  date: { type: Date, default: Date.now },
-  status: { type: String, enum: ['Present', 'Absent', 'Late', 'Half Day'], default: 'Present' },
-  clockIn: { type: Date },
-  clockOut: { type: Date },
-  workSummary: { type: String }
-}, { timestamps: true });
+const Attendance = sequelize.define('Attendance', {
+  _id: {
+    type: DataTypes.UUID,
+    defaultValue: DataTypes.UUIDV4,
+    primaryKey: true
+  },
+  userId: {
+    type: DataTypes.UUID,
+    allowNull: false
+  },
+  workspaceId: {
+    type: DataTypes.UUID,
+    allowNull: false
+  },
+  date: {
+    type: DataTypes.DATE,
+    defaultValue: DataTypes.NOW
+  },
+  status: {
+    type: DataTypes.STRING, // 'Present', 'Absent', 'Late', 'Half Day'
+    defaultValue: 'Present'
+  },
+  clockIn: {
+    type: DataTypes.DATE,
+    allowNull: true
+  },
+  clockOut: {
+    type: DataTypes.DATE,
+    allowNull: true
+  },
+  workSummary: {
+    type: DataTypes.TEXT,
+    allowNull: true
+  }
+}, {
+  timestamps: true
+});
 
-module.exports = mongoose.model('Attendance', attendanceSchema);
+module.exports = Attendance;

@@ -15,33 +15,37 @@ const createWorkspace = async (req, res) => {
       name,
       description,
       inviteCode,
-      owner: req.user._id,
-      admins: [req.user._id],
-      members: [req.user._id],
+      ownerId: req.user._id
     });
 
-    // Ensure user is updated as Admin and workspace is added
-    await User.findByIdAndUpdate(req.user._id, {
-      $addToSet: { workspaces: workspace._id },
-      role: 'Admin'
-    });
+    // Add user as admin and member
+    await workspace.addMember(req.user._id);
+    await workspace.addAdmin(req.user._id);
+
+    // Ensure user is updated to Admin role
+    const user = await User.findByPk(req.user._id);
+    if (user) {
+      user.role = 'Admin';
+      await user.save();
+    }
 
     // Create a default #general channel
-    await Channel.create({
+    const channel = await Channel.create({
       name: 'general',
       description: 'General discussion for the workspace',
-      workspace: workspace._id,
-      createdBy: req.user._id,
-      members: [req.user._id]
+      workspaceId: workspace._id,
+      isPrivate: false
     });
+    
+    // Add creator to general channel members
+    await channel.addMember(req.user._id);
 
     res.status(201).json(workspace);
   } catch (error) {
     console.error('CREATE_WORKSPACE_ERROR:', error);
     res.status(500).json({ 
       message: 'Failed to create workspace', 
-      error: error.message,
-      details: error.errors ? Object.keys(error.errors).map(k => error.errors[k].message) : []
+      error: error.message
     });
   }
 };
@@ -51,9 +55,33 @@ const createWorkspace = async (req, res) => {
 // @access  Private
 const getWorkspaces = async (req, res) => {
   try {
-    const workspaces = await Workspace.find({ members: req.user._id })
-      .populate('owner', 'name email')
-      .populate('admins', 'name email');
+    const user = await User.findByPk(req.user._id);
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    // Find all workspaces this user is a member of
+    const userWorkspaces = await user.getWorkspaces({
+      attributes: ['_id']
+    });
+    
+    const workspaceIds = userWorkspaces.map(w => w._id);
+
+    const workspaces = await Workspace.findAll({
+      where: { _id: workspaceIds },
+      include: [
+        {
+          model: User,
+          as: 'owner',
+          attributes: ['_id', 'name', 'email']
+        },
+        {
+          model: User,
+          as: 'admins',
+          attributes: ['_id', 'name', 'email']
+        }
+      ]
+    });
     
     // Auto-generate invite codes for workspaces that don't have one
     for (let wp of workspaces) {
@@ -65,6 +93,7 @@ const getWorkspaces = async (req, res) => {
 
     res.json(workspaces);
   } catch (error) {
+    console.error('[GET_WORKSPACES_ERR]', error);
     res.status(500).json({ message: 'Server Error', error: error.message });
   }
 };
@@ -76,25 +105,30 @@ const joinWorkspace = async (req, res) => {
   try {
     const { inviteCode } = req.body;
     
-    const workspace = await Workspace.findOne({ inviteCode });
+    const workspace = await Workspace.findOne({ where: { inviteCode } });
     if (!workspace) {
       return res.status(404).json({ message: 'Invalid invite code' });
     }
 
-    if (workspace.members.includes(req.user._id)) {
+    const isAlreadyMember = await workspace.hasMember(req.user._id);
+    if (isAlreadyMember) {
       return res.status(400).json({ message: 'Already a member of this workspace' });
     }
 
-    workspace.members.push(req.user._id);
-    await workspace.save();
+    await workspace.addMember(req.user._id);
 
-    await User.findByIdAndUpdate(req.user._id, {
-      $push: { workspaces: workspace._id }
+    // Also auto-add user to the general channel of this workspace
+    const channel = await Channel.findOne({
+      where: { workspaceId: workspace._id, name: 'general' }
     });
+    if (channel) {
+      await channel.addMember(req.user._id);
+    }
 
     res.json(workspace);
   } catch (error) {
-    res.status(500).json({ message: 'Server Error', error: error.message });
+    console.error('[JOIN_WORKSPACE_ERR]', error);
+    res.status(500).json({ message: `Server Error: ${error.message}` });
   }
 };
 
@@ -104,26 +138,33 @@ const joinWorkspace = async (req, res) => {
 const addMember = async (req, res) => {
   try {
     const { userId } = req.body;
-    const workspace = await Workspace.findById(req.params.id);
+    const workspace = await Workspace.findByPk(req.params.id);
 
     if (!workspace) return res.status(404).json({ message: 'Workspace not found' });
-    if (!workspace.admins.includes(req.user._id)) {
+    
+    const isAdmin = await workspace.hasAdmin(req.user._id);
+    if (!isAdmin) {
       return res.status(403).json({ message: 'Only admins can add members' });
     }
 
-    if (workspace.members.includes(userId)) {
+    const isAlreadyMember = await workspace.hasMember(userId);
+    if (isAlreadyMember) {
       return res.status(400).json({ message: 'User is already a member' });
     }
 
-    workspace.members.push(userId);
-    await workspace.save();
+    await workspace.addMember(userId);
 
-    await User.findByIdAndUpdate(userId, {
-      $push: { workspaces: workspace._id }
+    // Also auto-add user to the general channel of this workspace
+    const channel = await Channel.findOne({
+      where: { workspaceId: workspace._id, name: 'general' }
     });
+    if (channel) {
+      await channel.addMember(userId);
+    }
 
     res.json({ message: 'Member added successfully', workspace });
   } catch (error) {
+    console.error('[ADD_MEMBER_ERR]', error);
     res.status(500).json({ message: 'Server Error', error: error.message });
   }
 };
@@ -134,13 +175,12 @@ const addMember = async (req, res) => {
 const getWorkspaceStats = async (req, res) => {
   try {
     const workspaceId = req.params.id;
-    const workspace = await Workspace.findById(workspaceId);
+    const workspace = await Workspace.findByPk(workspaceId);
     if (!workspace) return res.status(404).json({ message: 'Workspace not found' });
 
-    const memberCount = workspace.members.length;
-    const channelCount = await Channel.countDocuments({ workspace: workspaceId });
+    const memberCount = await workspace.countMembers();
+    const channelCount = await Channel.count({ where: { workspaceId } });
     
-    // For now, these are placeholder logic until more models are added
     const pendingTasks = 0; 
     const upcomingMeetings = 0;
 
@@ -151,6 +191,7 @@ const getWorkspaceStats = async (req, res) => {
       upcomingMeetings
     });
   } catch (error) {
+    console.error('[GET_STATS_ERR]', error);
     res.status(500).json({ message: 'Server Error', error: error.message });
   }
 };
@@ -161,10 +202,12 @@ const getWorkspaceStats = async (req, res) => {
 const updateWorkspace = async (req, res) => {
   try {
     const { name, description } = req.body;
-    const workspace = await Workspace.findById(req.params.id);
+    const workspace = await Workspace.findByPk(req.params.id);
 
     if (!workspace) return res.status(404).json({ message: 'Workspace not found' });
-    if (!workspace.admins.includes(req.user._id)) {
+    
+    const isAdmin = await workspace.hasAdmin(req.user._id);
+    if (!isAdmin) {
       return res.status(403).json({ message: 'Only admins can update workspace settings' });
     }
 
@@ -174,6 +217,7 @@ const updateWorkspace = async (req, res) => {
     await workspace.save();
     res.json(workspace);
   } catch (error) {
+    console.error('[UPDATE_WORKSPACE_ERR]', error);
     res.status(500).json({ message: 'Server Error', error: error.message });
   }
 };
@@ -183,10 +227,16 @@ const updateWorkspace = async (req, res) => {
 // @access  Private
 const getWorkspaceMembers = async (req, res) => {
   try {
-    const workspace = await Workspace.findById(req.params.id).populate('members', 'name email profileImage role');
+    const workspace = await Workspace.findByPk(req.params.id);
     if (!workspace) return res.status(404).json({ message: 'Workspace not found' });
-    res.json(workspace.members);
+    
+    const members = await workspace.getMembers({
+      attributes: ['_id', 'name', 'email', 'profileImage', 'role']
+    });
+    
+    res.json(members);
   } catch (error) {
+    console.error('[GET_MEMBERS_ERR]', error);
     res.status(500).json({ message: 'Server Error', error: error.message });
   }
 };

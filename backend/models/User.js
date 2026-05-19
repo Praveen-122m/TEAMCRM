@@ -1,71 +1,88 @@
-const mongoose = require('mongoose');
+const { DataTypes } = require('sequelize');
+const { sequelize } = require('../config/db');
 const bcrypt = require('bcryptjs');
 
-const userSchema = new mongoose.Schema({
+const User = sequelize.define('User', {
+  _id: {
+    type: DataTypes.UUID,
+    defaultValue: DataTypes.UUIDV4,
+    primaryKey: true
+  },
   name: {
-    type: String,
-    required: true,
+    type: DataTypes.STRING,
+    allowNull: false
   },
   email: {
-    type: String,
-    sparse: true,
-    unique: true,
+    type: DataTypes.STRING,
+    allowNull: true,
+    unique: true
   },
   phoneNumber: {
-    type: String,
-    default: '',
+    type: DataTypes.STRING,
+    defaultValue: ''
   },
   password: {
-    type: String,
-    required: true,
+    type: DataTypes.STRING,
+    allowNull: false
   },
   role: {
-    type: String,
-    enum: ['Admin', 'Member', 'Client'],
-    default: 'Member',
+    type: DataTypes.STRING, // 'Admin', 'Member', 'Client'
+    defaultValue: 'Member'
   },
   secretCode: {
-    type: String,
-    unique: true,
-    sparse: true,
+    type: DataTypes.STRING,
+    allowNull: true,
+    unique: true
   },
   profileImage: {
-    type: String,
-    default: '',
+    type: DataTypes.STRING,
+    defaultValue: ''
   },
   bio: {
-    type: String,
-    default: '',
+    type: DataTypes.STRING,
+    defaultValue: ''
   },
   department: {
-    type: String,
-    default: '',
+    type: DataTypes.STRING,
+    defaultValue: ''
   },
   statusMessage: {
-    type: String,
-    default: '',
+    type: DataTypes.STRING,
+    defaultValue: ''
   },
   isOnline: {
-    type: Boolean,
-    default: false,
+    type: DataTypes.BOOLEAN,
+    defaultValue: false
   },
-  workspaces: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Workspace',
-  }],
-}, { timestamps: true });
-
-userSchema.pre('save', async function (next) {
-  if (!this.isModified('password')) {
-    next();
+  settings: {
+    type: DataTypes.JSON,
+    defaultValue: {
+      theme: 'light',
+      emailNotifications: true,
+      messageNotifications: true
+    }
   }
-  const salt = await bcrypt.genSalt(10);
-  this.password = await bcrypt.hash(this.password, salt);
+}, {
+  timestamps: true,
+  hooks: {
+    beforeCreate: async (user) => {
+      if (user.password) {
+        const salt = await bcrypt.genSalt(10);
+        user.password = await bcrypt.hash(user.password, salt);
+      }
+    },
+    beforeUpdate: async (user) => {
+      if (user.changed('password')) {
+        const salt = await bcrypt.genSalt(10);
+        user.password = await bcrypt.hash(user.password, salt);
+      }
+    }
+  }
 });
 
-userSchema.methods.matchPassword = async function (enteredPassword) {
+// Instance method to check password match
+User.prototype.matchPassword = async function (enteredPassword) {
   return await bcrypt.compare(enteredPassword, this.password);
 };
 
-const User = mongoose.model('User', userSchema);
 module.exports = User;

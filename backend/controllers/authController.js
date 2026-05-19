@@ -1,4 +1,6 @@
 const User = require('../models/User');
+const Workspace = require('../models/Workspace');
+const Channel = require('../models/Channel');
 const generateToken = require('../utils/generateToken');
 
 // @desc    Auth user & get token
@@ -10,25 +12,30 @@ const authUser = async (req, res) => {
 
     let user;
     if (secretCode) {
-      user = await User.findOne({ secretCode: secretCode.trim() });
+      user = await User.findOne({ where: { secretCode: secretCode.trim() } });
     } else {
-      user = await User.findOne({ email });
+      user = await User.findOne({ where: { email } });
     }
 
     if (user && (await user.matchPassword(password))) {
+      // Load user workspaces
+      const workspaces = await user.getWorkspaces({ attributes: ['_id'] });
+      const workspaceIds = workspaces.map(w => w._id);
+
       res.json({
         _id: user._id,
         name: user.name,
         email: user.email,
         role: user.role,
         profileImage: user.profileImage,
-        workspaces: user.workspaces,
+        workspaces: workspaceIds,
         token: generateToken(user._id),
       });
     } else {
       res.status(401).json({ message: 'Invalid credentials' });
     }
   } catch (error) {
+    console.error('[AUTH_ERR]', error);
     res.status(500).json({ message: 'Server Error', error: error.message });
   }
 };
@@ -44,13 +51,13 @@ const registerUser = async (req, res) => {
       return res.status(400).json({ message: 'Please provide all fields' });
     }
 
-    const userExists = await User.findOne({ email });
+    const userExists = await User.findOne({ where: { email } });
 
     if (userExists) {
       return res.status(400).json({ message: 'User already exists' });
     }
 
-    const userCount = await User.countDocuments();
+    const userCount = await User.count();
     const role = userCount === 0 ? 'Admin' : 'Member';
 
     const user = await User.create({
@@ -73,7 +80,11 @@ const registerUser = async (req, res) => {
       res.status(400).json({ message: 'Invalid user data' });
     }
   } catch (error) {
-    res.status(500).json({ message: 'Server Error', error: error.message });
+    console.error('Registration Error:', error);
+    if (error.name === 'SequelizeUniqueConstraintError') {
+      return res.status(400).json({ message: 'Email address already in use' });
+    }
+    res.status(500).json({ message: 'Registration failed: ' + error.message });
   }
 };
 
@@ -82,8 +93,11 @@ const registerUser = async (req, res) => {
 // @access  Private
 const getUserProfile = async (req, res) => {
   try {
-    const user = await User.findById(req.user._id);
+    const user = await User.findByPk(req.user._id);
     if (user) {
+      const workspaces = await user.getWorkspaces({ attributes: ['_id'] });
+      const workspaceIds = workspaces.map(w => w._id);
+
       res.json({
         _id: user._id,
         name: user.name,
@@ -93,13 +107,14 @@ const getUserProfile = async (req, res) => {
         bio: user.bio,
         department: user.department,
         statusMessage: user.statusMessage,
-        workspaces: user.workspaces,
+        workspaces: workspaceIds,
         secretCode: user.secretCode
       });
     } else {
       res.status(404).json({ message: 'User not found' });
     }
   } catch (error) {
+    console.error('[GET_PROFILE_ERR]', error);
     res.status(500).json({ message: 'Server Error', error: error.message });
   }
 };
@@ -109,36 +124,111 @@ const createClient = async (req, res) => {
   try {
     const { name, secretCode, password, workspaceId } = req.body;
 
-    // Check if secret code already exists
-    const codeExists = await User.findOne({ secretCode });
-    if (codeExists) {
-      return res.status(400).json({ message: 'Secret Code already in use' });
+    if (!name || !secretCode || !password || !workspaceId || workspaceId === 'null') {
+      return res.status(400).json({ message: 'Error: You must CREATE a workspace first before adding clients!' });
     }
 
+    // Check if secret code already exists
+    const codeExists = await User.findOne({ where: { secretCode: secretCode.trim() } });
+    if (codeExists) {
+      return res.status(400).json({ message: 'Secret ID already in use' });
+    }
+
+    // Create Client User
     const user = await User.create({
       name,
       password,
       secretCode: secretCode.trim(),
-      role: 'Client',
-      workspaces: [workspaceId]
+      role: 'Client'
     });
+
+    // Add Client to the Workspace members list explicitly
+    const workspace = await Workspace.findByPk(workspaceId);
+    if (!workspace) {
+      console.log(`[CREATE CLIENT] Workspace ${workspaceId} not found!`);
+      return res.status(404).json({ message: 'Workspace not found. Please clear your cache or logout and log back in.' });
+    }
+    
+    console.log(`[CREATE CLIENT] Adding user ${user.name} to workspace ${workspace.name}`);
+    await workspace.addMember(user._id);
+
+    try {
+      // Automatically add client to #general channel
+      const channel = await Channel.findOne({
+        where: { workspaceId, name: 'general' }
+      });
+      if (channel) {
+        await channel.addMember(user._id);
+      }
+    } catch (chanErr) {
+      console.error('Failed to add client to channel', chanErr);
+    }
+
     res.status(201).json(user);
   } catch (error) {
-    res.status(500).json({ message: 'Server Error', error: error.message });
+    console.error('Create Client Error:', error);
+    res.status(500).json({ message: 'Onboarding failed: ' + error.message });
   }
 };
 
-// @desc    Get all clients for a workspace (Admin only)
 const getClients = async (req, res) => {
   try {
-    const clients = await User.find({ 
-      workspaces: req.params.workspaceId, 
-      role: 'Client' 
+    const workspaceId = req.params.workspaceId;
+    console.log(`[GET CLIENTS] Fetching for workspace: ${workspaceId}`);
+    
+    const workspace = await Workspace.findByPk(workspaceId);
+    if (!workspace) {
+      console.log(`[GET CLIENTS] Workspace not found!`);
+      return res.status(404).json({ message: 'Workspace not found' });
+    }
+    
+    const clients = await workspace.getMembers({
+      where: { role: 'Client' }
     });
+    
+    console.log(`[GET CLIENTS] Found ${clients.length} clients`);
     res.json(clients);
   } catch (error) {
+    console.error('[GET_CLIENTS_ERR]', error);
     res.status(500).json({ message: 'Server Error' });
   }
 };
 
-module.exports = { authUser, registerUser, getUserProfile, createClient, getClients };
+// @desc    Forgot Password - Mock implementation
+const forgotPassword = async (req, res) => {
+  try {
+    const { email } = req.body;
+    const user = await User.findOne({ where: { email } });
+
+    if (!user) {
+      return res.status(404).json({ message: 'User with this email does not exist' });
+    }
+
+    res.json({ message: 'Password reset link sent to your email (Simulated)', success: true });
+  } catch (error) {
+    console.error('[FORGOT_PASS_ERR]', error);
+    res.status(500).json({ message: 'Server Error' });
+  }
+};
+
+// @desc    Reset Password - Mock implementation
+const resetPassword = async (req, res) => {
+  try {
+    const { email, newPassword } = req.body;
+    const user = await User.findOne({ where: { email } });
+
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+
+    user.password = newPassword;
+    await user.save();
+
+    res.json({ message: 'Password updated successfully', success: true });
+  } catch (error) {
+    console.error('[RESET_PASS_ERR]', error);
+    res.status(500).json({ message: 'Server Error' });
+  }
+};
+
+module.exports = { authUser, registerUser, getUserProfile, createClient, getClients, forgotPassword, resetPassword };

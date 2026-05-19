@@ -3,7 +3,7 @@ const express = require('express');
 const http = require('http');
 const cors = require('cors');
 const { Server } = require('socket.io');
-const connectDB = require('./config/db');
+const { connectDB } = require('./config/db');
 const { configureCloudinary } = require('./config/cloudinary');
 const socketHandler = require('./socket/socketHandler');
 
@@ -26,6 +26,10 @@ const path = require('path');
 
 // Middleware
 app.use(cors());
+app.use((req, res, next) => {
+  console.log(`${req.method} ${req.url}`);
+  next();
+});
 app.use(express.json({ limit: '100mb' }));
 app.use(express.urlencoded({ limit: '100mb', extended: true }));
 
@@ -34,6 +38,7 @@ app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 
 // Socket.IO
 socketHandler(io);
+app.set('socketio', io);
 
 // Routes
 app.get('/', (req, res) => {
@@ -49,6 +54,7 @@ app.use('/api/upload', require('./routes/uploadRoutes'));
 app.use('/api/meetings', require('./routes/meetingRoutes'));
 app.use('/api/attendance', require('./routes/attendanceRoutes'));
 app.use('/api/projects', require('./routes/projectRoutes'));
+app.use('/api/announcements', require('./routes/announcementRoutes'));
 
 // Error Handler Middleware
 // app.use(require('./middleware/errorMiddleware').errorHandler);

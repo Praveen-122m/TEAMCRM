@@ -25,7 +25,7 @@ router.post('/', protect, upload.single('file'), (req, res) => {
     if (['.mp4', '.mov', '.avi', '.wmv', '.webm'].includes(ext)) format = 'video';
 
     // Construct local URL - Use a relative URL for better flexibility
-    const fileUrl = `http://localhost:5005/uploads/${req.file.filename}`;
+    const fileUrl = `/uploads/${req.file.filename}`;
     console.log('Generated File URL:', fileUrl);
 
     res.json({

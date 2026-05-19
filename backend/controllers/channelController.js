@@ -1,5 +1,6 @@
 const Channel = require('../models/Channel');
 const Workspace = require('../models/Workspace');
+const User = require('../models/User');
 
 // @desc    Create a channel in a workspace
 // @route   POST /api/channels
@@ -8,29 +9,35 @@ const createChannel = async (req, res) => {
   try {
     const { name, description, workspaceId, isPrivate, members } = req.body;
 
-    const workspace = await Workspace.findById(workspaceId);
+    const workspace = await Workspace.findByPk(workspaceId);
     if (!workspace) {
       return res.status(404).json({ message: 'Workspace not found' });
     }
 
     // Verify user is member of workspace
-    if (!workspace.members.includes(req.user._id)) {
+    const isWorkspaceMember = await workspace.hasMember(req.user._id);
+    if (!isWorkspaceMember) {
       return res.status(403).json({ message: 'Not a member of this workspace' });
     }
 
     // Combine creator with selected members, ensure unique IDs
-    const memberList = isPrivate ? Array.from(new Set([...(members || []), req.user._id.toString()])) : [req.user._id];
+    const memberList = isPrivate 
+      ? Array.from(new Set([...(members || []), req.user._id])) 
+      : [req.user._id];
 
     const channel = await Channel.create({
       name,
       description,
-      workspace: workspaceId,
-      isPrivate: isPrivate || false,
-      members: memberList,
+      workspaceId,
+      isPrivate: isPrivate || false
     });
+
+    // Add members to channel
+    await channel.addMembers(memberList);
 
     res.status(201).json(channel);
   } catch (error) {
+    console.error('[CREATE_CHANNEL_ERR]', error);
     res.status(500).json({ message: 'Server Error', error: error.message });
   }
 };
@@ -40,25 +47,37 @@ const createChannel = async (req, res) => {
 // @access  Private
 const getChannels = async (req, res) => {
   try {
-    const workspace = await Workspace.findById(req.params.workspaceId);
+    const workspace = await Workspace.findByPk(req.params.workspaceId);
     if (!workspace) {
       return res.status(404).json({ message: 'Workspace not found' });
     }
 
-    if (!workspace.members.includes(req.user._id)) {
+    const isWorkspaceMember = await workspace.hasMember(req.user._id);
+    if (!isWorkspaceMember) {
       return res.status(403).json({ message: 'Not a member of this workspace' });
     }
 
-    const channels = await Channel.find({
-      workspace: req.params.workspaceId,
-      $or: [
-        { isPrivate: false },
-        { members: req.user._id }
+    // Fetch channels for the workspace
+    const channels = await Channel.findAll({
+      where: { workspaceId: req.params.workspaceId },
+      include: [
+        {
+          model: User,
+          as: 'members',
+          attributes: ['_id']
+        }
       ]
     });
 
-    res.json(channels);
+    // Filter private channels: only keep public ones OR ones where user is member
+    const filteredChannels = channels.filter(channel => {
+      if (!channel.isPrivate) return true;
+      return channel.members.some(member => member._id === req.user._id);
+    });
+
+    res.json(filteredChannels);
   } catch (error) {
+    console.error('[GET_CHANNELS_ERR]', error);
     res.status(500).json({ message: 'Server Error', error: error.message });
   }
 };

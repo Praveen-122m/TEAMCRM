@@ -1,31 +1,31 @@
-const mongoose = require('mongoose');
+const { DataTypes } = require('sequelize');
+const { sequelize } = require('../config/db');
 
-const workspaceSchema = new mongoose.Schema({
+const Workspace = sequelize.define('Workspace', {
+  _id: {
+    type: DataTypes.UUID,
+    defaultValue: DataTypes.UUIDV4,
+    primaryKey: true
+  },
   name: {
-    type: String,
-    required: true,
+    type: DataTypes.STRING,
+    allowNull: false
   },
   description: {
-    type: String,
+    type: DataTypes.STRING,
+    allowNull: true
   },
   inviteCode: {
-    type: String,
-    unique: true,
+    type: DataTypes.STRING,
+    allowNull: true,
+    unique: true
   },
-  owner: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true,
-  },
-  admins: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-  }],
-  members: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-  }],
-}, { timestamps: true });
+  ownerId: {
+    type: DataTypes.UUID,
+    allowNull: false
+  }
+}, {
+  timestamps: true
+});
 
-const Workspace = mongoose.model('Workspace', workspaceSchema);
 module.exports = Workspace;

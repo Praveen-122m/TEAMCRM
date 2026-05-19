@@ -1,16 +1,17 @@
 require('dotenv').config();
-const mongoose = require('mongoose');
+const { connectDB } = require('./config/db');
 const User = require('./models/User');
 
 const setAdmin = async () => {
   try {
-    await mongoose.connect(process.env.MONGODB_URI);
-    console.log('Connected to MongoDB');
+    // Authenticate and apply relations/sync
+    await connectDB();
+    console.log('Connected to SQL Database');
 
     // Upgrade all current users to Admin for development
-    const result = await User.updateMany({}, { $set: { role: 'Admin' } });
+    const [affectedCount] = await User.update({ role: 'Admin' }, { where: {} });
     
-    console.log(`Success! Updated ${result.modifiedCount} users to Admin.`);
+    console.log(`Success! Updated ${affectedCount} users to Admin.`);
     console.log('Please restart your backend and log in again.');
     
     process.exit();

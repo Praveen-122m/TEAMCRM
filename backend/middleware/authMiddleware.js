@@ -13,7 +13,13 @@ const protect = async (req, res, next) => {
 
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-      req.user = await User.findById(decoded.id).select('-password');
+      req.user = await User.findByPk(decoded.id, { attributes: { exclude: ['password'] } });
+      if (!req.user) {
+        return res.status(401).json({ message: 'Not authorized, user no longer exists' });
+      }
+      
+      const workspaces = await req.user.getWorkspaces({ attributes: ['_id'] });
+      req.user.workspaces = workspaces.map(w => w._id);
 
       next();
     } catch (error) {

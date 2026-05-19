@@ -1,150 +1,265 @@
 import React, { useEffect, useState, useContext } from 'react';
-import { Box, Typography, Grid, Paper, Avatar, List, ListItem, ListItemAvatar, ListItemText, Divider, Chip, CircularProgress, Button, TextField, Alert, IconButton, Tooltip, Tabs, Tab } from '@mui/material';
-import GroupIcon from '@mui/icons-material/Group';
-import TagIcon from '@mui/icons-material/Tag';
-import FlashOnIcon from '@mui/icons-material/FlashOn';
-import SecurityIcon from '@mui/icons-material/Security';
-import DeleteIcon from '@mui/icons-material/Delete';
-import VerifiedUserIcon from '@mui/icons-material/VerifiedUser';
-import ForumIcon from '@mui/icons-material/Forum';
-import SettingsIcon from '@mui/icons-material/Settings';
+import { 
+  Box, Typography, Grid, Paper, Avatar, List, ListItem, ListItemAvatar, 
+  ListItemText, Divider, Chip, CircularProgress, Button, IconButton, 
+  Tooltip, Stack, LinearProgress, InputBase, Link, Modal, TextField, Alert
+} from '@mui/material';
+import { 
+  Group as GroupIcon,
+  Tag as TagIcon,
+  Videocam as VideocamIcon,
+  Settings as SettingsIcon,
+  Add as AddIcon,
+  Search as SearchIcon,
+  Campaign as CampaignIcon,
+  PersonAdd as PersonAddIcon
+} from '@mui/icons-material';
 import axios from 'axios';
-import { QRCodeSVG } from 'qrcode.react';
 import { AuthContext } from '../context/AuthContext';
-import ChannelChat from './ChannelChat';
+import { useNavigate } from 'react-router-dom';
 
-const AdminStatCard = ({ title, value, icon, color, loading }) => (
-  <Paper sx={{ p: 3, borderRadius: 3, border: '1px solid #e2e8f0', display: 'flex', flexDirection: 'column', height: '100%' }}>
-    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-      <Box sx={{ p: 1, borderRadius: 2, backgroundColor: `${color}15`, color: color }}>{icon}</Box>
+const StatCard = ({ title, value, subtext, icon, color, trend, onClick }) => (
+  <Paper 
+    onClick={onClick}
+    sx={{ 
+      p: 3, borderRadius: 5, border: '1px solid #f1f3f5', 
+      boxShadow: '0 2px 12px rgba(0,0,0,0.02)', height: '100%',
+      cursor: onClick ? 'pointer' : 'default',
+      '&:hover': onClick ? { transform: 'translateY(-4px)', borderColor: color } : {},
+      transition: '0.2s'
+    }}
+  >
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 2, mb: 1.5 }}>
+      <Box sx={{ p: 1.5, borderRadius: 3, backgroundColor: `${color}15`, color: color }}>{icon}</Box>
+      <Box>
+        <Typography variant="h5" sx={{ fontWeight: 900, color: '#2d3436' }}>{value}</Typography>
+        <Typography variant="caption" sx={{ fontWeight: 700, color: '#adb5bd', textTransform: 'uppercase' }}>{title}</Typography>
+      </Box>
     </Box>
-    {loading ? <CircularProgress size={24} /> : (
-      <>
-        <Typography variant="h4" sx={{ fontWeight: 800, mb: 0.5 }}>{value}</Typography>
-        <Typography variant="subtitle2" sx={{ color: '#718096', fontWeight: 600 }}>{title}</Typography>
-      </>
-    )}
+    <Box sx={{ display: 'flex', alignItems: 'center', gap: 0.5 }}>
+      {trend && <Typography variant="caption" sx={{ fontWeight: 800, color: trend.startsWith('+') ? '#40c057' : '#adb5bd' }}>{trend}</Typography>}
+      <Typography variant="caption" sx={{ fontWeight: 700, color: '#adb5bd' }}>{subtext}</Typography>
+    </Box>
   </Paper>
 );
 
 const AdminPanel = () => {
-  const { user } = useContext(AuthContext);
-  const [stats, setStats] = useState(null);
-  const [workspace, setWorkspace] = useState(null);
-  const [members, setMembers] = useState([]);
+  const { user, activeWorkspace } = useContext(AuthContext);
+  const navigate = useNavigate();
   const [loading, setLoading] = useState(true);
-  const [activeTab, setActiveTab] = useState(0);
+  const [stats, setStats] = useState({ 
+    members: 0, 
+    channels: 0,
+    clients: 0
+  });
+  const [announcements, setAnnouncements] = useState([]);
+  const [members, setMembers] = useState([]);
+  const [isAnnModalOpen, setIsAnnModalOpen] = useState(false);
+  const [isClientModalOpen, setIsClientModalOpen] = useState(false);
+  const [newAnn, setNewAnn] = useState({ title: '', message: '' });
+  const [newClient, setNewClient] = useState({ name: '', secretCode: '', password: '' });
+  const [msg, setMsg] = useState({ type: '', text: '' });
 
   const fetchData = async () => {
+    const workspaceId = activeWorkspace || user?.workspaces?.[0] || localStorage.getItem('activeWorkspace');
+    if (!workspaceId || workspaceId === 'null') {
+      setLoading(false);
+      return;
+    }
+
+    setLoading(true);
     try {
-      setLoading(true);
-      const [statsRes, wpRes] = await Promise.all([
-        axios.get('/api/users/admin/stats'),
-        axios.get('/api/workspaces')
+      const [annRes, memRes, chRes, clientRes] = await Promise.allSettled([
+        axios.get(`/api/announcements/${workspaceId}`),
+        axios.get(`/api/workspaces/${workspaceId}/members`),
+        axios.get(`/api/channels/${workspaceId}`),
+        axios.get(`/api/auth/clients/${workspaceId}`)
       ]);
-      setStats(statsRes.data);
-      if (wpRes.data.length > 0) {
-        const wp = wpRes.data[0];
-        setWorkspace(wp);
-        const memRes = await axios.get(`/api/workspaces/${wp._id}/members`);
-        setMembers(memRes.data);
+
+      const newStats = { members: 0, channels: 0, clients: 0 };
+      
+      if (memRes.status === 'fulfilled') {
+        setMembers(memRes.value.data);
+        newStats.members = memRes.value.data.length;
       }
+      if (chRes.status === 'fulfilled') newStats.channels = chRes.value.data.length;
+      if (clientRes.status === 'fulfilled') newStats.clients = clientRes.value.data.length;
+      if (annRes.status === 'fulfilled') setAnnouncements(annRes.value.data.slice(0, 4));
+
+      setStats(newStats);
     } catch (err) {
-      console.error(err);
+      console.error('Admin Panel Fetch Error', err);
     } finally {
       setLoading(false);
     }
   };
 
   useEffect(() => {
-    if (user) fetchData();
-  }, [user]);
+    fetchData();
+  }, [activeWorkspace]);
 
-  const handleRoleChange = async (memberId, currentRole) => {
+  const handleCreateAnnouncement = async () => {
+    if (!newAnn.title || !newAnn.message) return;
     try {
-      const newRole = currentRole === 'Admin' ? 'Member' : 'Admin';
-      await axios.put(`/api/workspaces/${workspace._id}/members/${memberId}/role`, { role: newRole });
+      const workspaceId = activeWorkspace || user?.workspaces?.[0];
+      await axios.post('/api/announcements', { ...newAnn, workspace: workspaceId });
+      setNewAnn({ title: '', message: '' });
+      setIsAnnModalOpen(false);
       fetchData();
     } catch (err) {
-      alert('Failed to change role');
+      console.error('Failed to create announcement', err);
+    }
+  };
+
+  const handleOnboardClient = async () => {
+    try {
+      const workspaceId = activeWorkspace || user?.workspaces?.[0];
+      await axios.post('/api/auth/clients', { ...newClient, workspaceId });
+      setMsg({ type: 'success', text: `Client ${newClient.name} added!` });
+      setIsClientModalOpen(false);
+      setNewClient({ name: '', secretCode: '', password: '' });
+      fetchData();
+    } catch (err) {
+      setMsg({ type: 'error', text: 'Onboarding failed' });
     }
   };
 
   if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', mt: 10 }}><CircularProgress /></Box>;
 
   return (
-    <Box sx={{ p: 4, maxWidth: 1400, mx: 'auto' }}>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-end', mb: 4 }}>
+    <Box sx={{ p: 4, maxWidth: '1600px', mx: 'auto', backgroundColor: '#fcfcfc', minHeight: '100vh' }}>
+      {/* Header */}
+      <Box sx={{ mb: 5, display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
         <Box>
-          <Typography variant="h4" sx={{ fontWeight: 800, letterSpacing: '-1.5px', mb: 1 }}>{workspace?.name} Dashboard</Typography>
-          <Typography variant="subtitle2" color="textSecondary">Manage your team and collaborate in real-time</Typography>
+          <Typography variant="h4" sx={{ fontWeight: 900, color: '#1a202c', mb: 1 }}>
+            Admin Control Dashboard 👋
+          </Typography>
+          <Typography variant="body1" sx={{ color: '#718096' }}>
+            Overview of your workspace members, clients and communications.
+          </Typography>
         </Box>
-        <Tabs value={activeTab} onChange={(e, v) => setActiveTab(v)} sx={{ '& .MuiTabs-indicator': { height: 3, borderRadius: '3px 3px 0 0' } }}>
-          <Tab icon={<SettingsIcon />} label="Overview" sx={{ textTransform: 'none', fontWeight: 700 }} />
-          <Tab icon={<ForumIcon />} label="Workspace Chat" sx={{ textTransform: 'none', fontWeight: 700 }} />
-        </Tabs>
+        <Box sx={{ display: 'flex', gap: 2 }}>
+          <Button 
+            variant="outlined" 
+            startIcon={<PersonAddIcon />}
+            onClick={() => setIsClientModalOpen(true)}
+            sx={{ borderRadius: 3, fontWeight: 800, textTransform: 'none' }}
+          >
+            Add Client
+          </Button>
+          <Button 
+            variant="contained" 
+            startIcon={<AddIcon />}
+            sx={{ borderRadius: 3, fontWeight: 800, textTransform: 'none', backgroundColor: '#4c6ef5' }}
+            onClick={() => navigate('/workspaces')}
+          >
+            Switch Workspace
+          </Button>
+        </Box>
       </Box>
 
-      {activeTab === 0 ? (
-        <>
-          <Grid container spacing={3} sx={{ mb: 5 }}>
-            <Grid item xs={12} sm={6} md={3}><AdminStatCard title="Team Members" value={members.length} icon={<GroupIcon />} color="#5a67d8" /></Grid>
-            <Grid item xs={12} sm={6} md={3}><AdminStatCard title="Total Channels" value={stats?.totalChannels || 0} icon={<TagIcon />} color="#48bb78" /></Grid>
-            <Grid item xs={12} sm={6} md={3}><AdminStatCard title="Workspace Level" value="Pro" icon={<VerifiedUserIcon />} color="#ed8936" /></Grid>
-            <Grid item xs={12} sm={6} md={3}><AdminStatCard title="Active Status" value="Online" icon={<FlashOnIcon />} color="#e53e3e" /></Grid>
-          </Grid>
+      {msg.text && <Alert severity={msg.type} sx={{ mb: 4, borderRadius: 3 }} onClose={() => setMsg({text:'', type:''})}>{msg.text}</Alert>}
 
-          <Grid container spacing={4}>
-            <Grid item xs={12} md={8}>
-              <Typography variant="h6" sx={{ fontWeight: 800, mb: 2 }}>Member Management</Typography>
-              <Paper sx={{ borderRadius: 4, border: '1px solid #f0f0f0', overflow: 'hidden', boxShadow: 'none' }}>
-                <List sx={{ p: 0 }}>
-                  {members.map((m, idx) => (
-                    <React.Fragment key={m._id}>
-                      <ListItem sx={{ py: 2, px: 3 }}>
-                        <ListItemAvatar><Avatar src={m.profileImage} sx={{ borderRadius: 2 }} /></ListItemAvatar>
-                        <ListItemText primary={m.name} secondary={m.email} primaryTypographyProps={{ fontWeight: 700 }} />
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <Chip label={m.role || 'Member'} size="small" sx={{ fontWeight: 700, backgroundColor: m.role === 'Admin' ? '#ebf4ff' : '#f7fafc', color: m.role === 'Admin' ? '#5a67d8' : '#718096' }} />
-                          {user._id !== m._id && (
-                            <IconButton size="small" onClick={() => handleRoleChange(m._id, m.role)}><SecurityIcon fontSize="small" /></IconButton>
-                          )}
-                        </Box>
-                      </ListItem>
-                      {idx < members.length - 1 && <Divider />}
-                    </React.Fragment>
+      <Grid container spacing={3} sx={{ mb: 6 }}>
+        <Grid item xs={12} sm={4}><StatCard title="Team Members" value={stats.members} icon={<GroupIcon />} color="#5c7cfa" subtext="Active users" onClick={() => navigate('/admin-suite')} /></Grid>
+        <Grid item xs={12} sm={4}><StatCard title="Workspace Clients" value={stats.clients} icon={<PersonAddIcon />} color="#be4bdb" subtext="Client accounts" onClick={() => navigate('/admin-suite')} /></Grid>
+        <Grid item xs={12} sm={4}><StatCard title="Active Channels" value={stats.channels} icon={<TagIcon />} color="#40c057" subtext="Team channels" onClick={() => navigate('/channels')} /></Grid>
+      </Grid>
+
+      {/* Content Row */}
+      <Grid container spacing={4}>
+        <Grid item xs={12} md={7}>
+          <Paper sx={{ p: 4, borderRadius: 6, border: '1px solid #f1f3f5', height: '100%' }}>
+            <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 4 }}>
+              <Typography variant="h6" sx={{ fontWeight: 900 }}>Workspace Team</Typography>
+              <Link onClick={() => navigate('/admin-suite')} sx={{ cursor: 'pointer', fontSize: '0.85rem', fontWeight: 800, color: '#4c6ef5', textDecoration: 'none' }}>Manage Team</Link>
+            </Box>
+            <Stack spacing={3}>
+               {members.slice(0, 8).map((m, i) => (
+                 <Box key={i} sx={{ display: 'flex', gap: 2, alignItems: 'center' }}>
+                   <Avatar src={m.profileImage} sx={{ width: 40, height: 40, borderRadius: 2 }} />
+                   <Box sx={{ flexGrow: 1 }}>
+                     <Typography variant="subtitle2" sx={{ fontWeight: 900 }}>{m.name}</Typography>
+                     <Typography variant="caption" sx={{ color: '#adb5bd', fontWeight: 700 }}>{m.role || 'Member'}</Typography>
+                   </Box>
+                   <Chip label="Member" size="small" variant="outlined" sx={{ fontWeight: 800, fontSize: '0.65rem' }} />
+                 </Box>
+               ))}
+            </Stack>
+          </Paper>
+        </Grid>
+
+        <Grid item xs={12} md={5}>
+          <Grid container spacing={3}>
+            <Grid item xs={12}>
+              <Paper sx={{ p: 4, borderRadius: 6, border: '1px solid #f1f3f5' }}>
+                <Typography variant="h6" sx={{ fontWeight: 900, mb: 4 }}>Latest Announcements</Typography>
+                <Stack spacing={2.5}>
+                  {announcements.map(ann => (
+                    <Box 
+                      key={ann._id} 
+                      onClick={() => navigate('/announcements', { state: { announcementId: ann._id } })}
+                      sx={{ 
+                        display: 'flex', gap: 2, p: 2, borderRadius: 4, backgroundColor: '#f8f9fa', 
+                        cursor: 'pointer', transition: '0.2s', '&:hover': { backgroundColor: '#edf2ff', transform: 'translateX(5px)' } 
+                      }}
+                    >
+                      <Box sx={{ p: 1, height: 'fit-content', borderRadius: 2, backgroundColor: '#fff', border: '1px solid #f1f3f5' }}>
+                        <CampaignIcon sx={{ fontSize: 20, color: '#4c6ef5' }} />
+                      </Box>
+                      <Box>
+                        <Typography variant="subtitle2" sx={{ fontWeight: 900 }}>{ann.title}</Typography>
+                        <Typography variant="caption" sx={{ color: '#adb5bd', fontWeight: 600, display: '-webkit-box', WebkitLineClamp: 1, WebkitBoxOrient: 'vertical', overflow: 'hidden' }}>{ann.message}</Typography>
+                      </Box>
+                    </Box>
                   ))}
-                </List>
+                  <Button fullWidth variant="contained" startIcon={<AddIcon />} onClick={() => setIsAnnModalOpen(true)} sx={{ mt: 1, fontWeight: 900, backgroundColor: '#4c6ef5', borderRadius: 3 }}>New Announcement</Button>
+                </Stack>
               </Paper>
             </Grid>
 
-            <Grid item xs={12} md={4}>
-              <Typography variant="h6" sx={{ fontWeight: 800, mb: 2 }}>Invite Code & QR</Typography>
-              <Paper sx={{ p: 3, borderRadius: 4, border: '1px solid #f0f0f0', textAlign: 'center', boxShadow: 'none' }}>
-                <Box sx={{ p: 2, backgroundColor: 'white', display: 'inline-block', borderRadius: 3, border: '1px solid #f0f0f0', mb: 3 }}>
-                   <QRCodeSVG value={workspace?.inviteCode || 'N/A'} size={150} />
-                </Box>
-                <Box sx={{ display: 'flex', gap: 1, alignItems: 'center', backgroundColor: '#f7fafc', p: 1, borderRadius: 2, border: '1px solid #e2e8f0' }}>
-                   <Typography variant="h6" sx={{ flexGrow: 1, fontWeight: 800, letterSpacing: 2 }}>{workspace?.inviteCode}</Typography>
-                   <Button variant="contained" size="small" onClick={() => { navigator.clipboard.writeText(workspace.inviteCode); alert('Copied!'); }} sx={{ borderRadius: 1.5, backgroundColor: '#5a67d8' }}>Copy</Button>
-                </Box>
+            <Grid item xs={12}>
+              <Paper sx={{ p: 4, borderRadius: 6, border: '1px solid #f1f3f5' }}>
+                <Typography variant="h6" sx={{ fontWeight: 900, mb: 4 }}>Quick Shortcuts</Typography>
+                <Stack direction="row" spacing={2}>
+                  <Button fullWidth variant="outlined" onClick={() => navigate('/admin-suite')} sx={{ py: 1.5, borderRadius: 3, fontWeight: 800 }}>Workspace Settings</Button>
+                  <Button fullWidth variant="outlined" onClick={() => navigate('/channels')} sx={{ py: 1.5, borderRadius: 3, fontWeight: 800 }}>Open Chat</Button>
+                </Stack>
               </Paper>
             </Grid>
           </Grid>
-        </>
-      ) : (
-        <Box sx={{ 
-          borderRadius: '0 0 24px 24px', 
-          overflow: 'hidden', 
-          border: '1px solid #e2e8f0',
-          borderTop: 'none',
-          backgroundColor: '#ffffff',
-          height: 'calc(100vh - 220px)',
-          boxShadow: '0 4px 6px -1px rgba(0, 0, 0, 0.1)'
-        }}>
-          <ChannelChat isEmbedded={true} />
+        </Grid>
+      </Grid>
+
+      {/* Modals */}
+      <Modal open={isAnnModalOpen} onClose={() => setIsAnnModalOpen(false)}>
+        <Box sx={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: 450, bgcolor: 'background.paper', borderRadius: 5, p: 4 }}>
+          <Typography variant="h6" sx={{ fontWeight: 900, mb: 3 }}>Broadcast Announcement</Typography>
+          <Stack spacing={3}>
+            <TextField fullWidth label="Title" variant="outlined" value={newAnn.title} onChange={(e) => setNewAnn({...newAnn, title: e.target.value})} />
+            <TextField fullWidth multiline rows={4} label="Message" variant="outlined" value={newAnn.message} onChange={(e) => setNewAnn({...newAnn, message: e.target.value})} />
+            <Box sx={{ display: 'flex', gap: 2, mt: 2 }}>
+              <Button fullWidth variant="outlined" onClick={() => setIsAnnModalOpen(false)}>Cancel</Button>
+              <Button fullWidth variant="contained" onClick={handleCreateAnnouncement} sx={{ backgroundColor: '#4c6ef5' }}>Broadcast</Button>
+            </Box>
+          </Stack>
         </Box>
-      )}
+      </Modal>
+
+      <Modal open={isClientModalOpen} onClose={() => setIsClientModalOpen(false)}>
+        <Box sx={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: 450, bgcolor: 'background.paper', borderRadius: 5, p: 4 }}>
+          <Typography variant="h6" sx={{ fontWeight: 900, mb: 3 }}>Onboard New Client</Typography>
+          <Stack spacing={3}>
+            <TextField fullWidth label="Full Name" variant="outlined" value={newClient.name} onChange={(e) => setNewClient({...newClient, name: e.target.value})} />
+            <TextField fullWidth label="Secret ID" variant="outlined" value={newClient.secretCode} onChange={(e) => setNewClient({...newClient, secretCode: e.target.value})} />
+            <TextField fullWidth type="password" label="Password" variant="outlined" value={newClient.password} onChange={(e) => setNewClient({...newClient, password: e.target.value})} />
+            <Box sx={{ display: 'flex', gap: 2, mt: 2 }}>
+              <Button fullWidth variant="outlined" onClick={() => setIsClientModalOpen(false)}>Cancel</Button>
+              <Button fullWidth variant="contained" onClick={handleOnboardClient} sx={{ backgroundColor: '#4c6ef5' }}>Add Client</Button>
+            </Box>
+          </Stack>
+        </Box>
+      </Modal>
     </Box>
   );
 };

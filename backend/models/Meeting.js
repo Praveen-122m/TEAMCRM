@@ -1,13 +1,43 @@
-const mongoose = require('mongoose');
+const { DataTypes } = require('sequelize');
+const { sequelize } = require('../config/db');
 
-const meetingSchema = new mongoose.Schema({
-  name: { type: String, required: true },
-  description: { type: String },
-  workspace: { type: mongoose.Schema.Types.ObjectId, ref: 'Workspace', required: true },
-  createdBy: { type: mongoose.Schema.Types.ObjectId, ref: 'User', required: true },
-  status: { type: String, enum: ['Active', 'Completed', 'Scheduled'], default: 'Active' },
-  roomId: { type: String, required: true, unique: true },
-  scheduledAt: { type: Date, default: Date.now }
-}, { timestamps: true });
+const Meeting = sequelize.define('Meeting', {
+  _id: {
+    type: DataTypes.UUID,
+    defaultValue: DataTypes.UUIDV4,
+    primaryKey: true
+  },
+  name: {
+    type: DataTypes.STRING,
+    allowNull: false
+  },
+  description: {
+    type: DataTypes.STRING,
+    allowNull: true
+  },
+  workspaceId: {
+    type: DataTypes.UUID,
+    allowNull: false
+  },
+  createdById: {
+    type: DataTypes.UUID,
+    allowNull: false
+  },
+  status: {
+    type: DataTypes.STRING, // 'Active', 'Completed', 'Scheduled'
+    defaultValue: 'Active'
+  },
+  roomId: {
+    type: DataTypes.STRING,
+    allowNull: false,
+    unique: true
+  },
+  scheduledAt: {
+    type: DataTypes.DATE,
+    defaultValue: DataTypes.NOW
+  }
+}, {
+  timestamps: true
+});
 
-module.exports = mongoose.model('Meeting', meetingSchema);
+module.exports = Meeting;

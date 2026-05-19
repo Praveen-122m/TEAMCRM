@@ -1,56 +1,62 @@
-const mongoose = require('mongoose');
+const { DataTypes } = require('sequelize');
+const { sequelize } = require('../config/db');
 
-const messageSchema = new mongoose.Schema({
-  sender: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-    required: true,
+const Message = sequelize.define('Message', {
+  _id: {
+    type: DataTypes.UUID,
+    defaultValue: DataTypes.UUIDV4,
+    primaryKey: true
+  },
+  senderId: {
+    type: DataTypes.UUID,
+    allowNull: false
   },
   content: {
-    type: String,
-    required: true,
+    type: DataTypes.TEXT,
+    allowNull: false
   },
-  channel: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Channel',
+  channelId: {
+    type: DataTypes.UUID,
+    allowNull: true
   },
-  workspace: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Workspace',
-    required: true,
+  workspaceId: {
+    type: DataTypes.UUID,
+    allowNull: false
   },
   fileUrl: {
-    type: String,
+    type: DataTypes.STRING,
+    allowNull: true
   },
   fileType: {
-    type: String, // e.g., 'image', 'document', 'video'
+    type: DataTypes.STRING,
+    allowNull: true
   },
   isAiGenerated: {
-    type: Boolean,
-    default: false,
+    type: DataTypes.BOOLEAN,
+    defaultValue: false
   },
   isDirectMessage: {
-    type: Boolean,
-    default: false,
+    type: DataTypes.BOOLEAN,
+    defaultValue: false
   },
-  receiver: { // For direct messages
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
+  receiverId: {
+    type: DataTypes.UUID,
+    allowNull: true
   },
-  readBy: [{
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'User',
-  }],
-  threadParent: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: 'Message',
-    default: null
+  threadParentId: {
+    type: DataTypes.UUID,
+    allowNull: true
   },
-  reactions: [{
-    emoji: String,
-    users: [{ type: mongoose.Schema.Types.ObjectId, ref: 'User' }]
-  }]
-}, { timestamps: true });
+  isAnnouncement: {
+    type: DataTypes.BOOLEAN,
+    defaultValue: false
+  },
+  status: {
+    type: DataTypes.STRING, // 'pending', 'approved', 'rejected'
+    defaultValue: 'approved'
+  }
+}, {
+  timestamps: true
+});
 
-const Message = mongoose.model('Message', messageSchema);
 module.exports = Message;

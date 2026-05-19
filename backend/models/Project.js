@@ -1,21 +1,54 @@
-const mongoose = require('mongoose');
+const { DataTypes } = require('sequelize');
+const { sequelize } = require('../config/db');
 
-const projectSchema = new mongoose.Schema({
-  name: { type: String, required: true },
-  description: { type: String },
-  workspace: { type: mongoose.Schema.Types.ObjectId, ref: 'Workspace', required: true },
-  client: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-  status: { type: String, enum: ['Pending', 'In Progress', 'Completed', 'On Hold'], default: 'Pending' },
-  progress: { type: Number, default: 0, min: 0, max: 100 },
-  deadline: { type: Date },
-  completedWork: [{ type: String }],
-  pendingWork: [{ type: String }],
-  feedback: [{
-    user: { type: mongoose.Schema.Types.ObjectId, ref: 'User' },
-    comment: String,
-    createdAt: { type: Date, default: Date.now }
-  }],
-  approvalStatus: { type: String, enum: ['Awaiting Approval', 'Approved', 'Rejected'], default: 'Awaiting Approval' }
-}, { timestamps: true });
+const Project = sequelize.define('Project', {
+  _id: {
+    type: DataTypes.UUID,
+    defaultValue: DataTypes.UUIDV4,
+    primaryKey: true
+  },
+  name: {
+    type: DataTypes.STRING,
+    allowNull: false
+  },
+  description: {
+    type: DataTypes.TEXT,
+    allowNull: true
+  },
+  workspaceId: {
+    type: DataTypes.UUID,
+    allowNull: false
+  },
+  clientId: {
+    type: DataTypes.UUID,
+    allowNull: true
+  },
+  status: {
+    type: DataTypes.STRING, // 'Pending', 'In Progress', 'Completed', 'On Hold'
+    defaultValue: 'Pending'
+  },
+  progress: {
+    type: DataTypes.INTEGER,
+    defaultValue: 0
+  },
+  deadline: {
+    type: DataTypes.DATE,
+    allowNull: true
+  },
+  completedWork: {
+    type: DataTypes.JSON,
+    defaultValue: []
+  },
+  pendingWork: {
+    type: DataTypes.JSON,
+    defaultValue: []
+  },
+  approvalStatus: {
+    type: DataTypes.STRING, // 'Awaiting Approval', 'Approved', 'Rejected'
+    defaultValue: 'Awaiting Approval'
+  }
+}, {
+  timestamps: true
+});
 
-module.exports = mongoose.model('Project', projectSchema);
+module.exports = Project;

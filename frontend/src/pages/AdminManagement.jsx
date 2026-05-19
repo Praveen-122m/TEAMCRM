@@ -1,93 +1,109 @@
 import React, { useState, useEffect, useContext } from 'react';
-import { Box, Typography, Grid, Paper, Tabs, Tab, Button, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Avatar, IconButton, Chip, TextField, Dialog, DialogTitle, DialogContent, DialogActions, Alert, List, ListItemButton, ListItemAvatar, ListItemText, Tooltip, Badge } from '@mui/material';
+import { 
+  Box, Typography, Grid, Paper, Tabs, Tab, Button, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, Avatar, IconButton, Chip, TextField, Dialog, DialogTitle, DialogContent, DialogActions, Alert, List, ListItem, ListItemButton, ListItemAvatar, ListItemText, Tooltip, Badge, CircularProgress, Modal, Divider, Breadcrumbs, Link, LinearProgress, Select, MenuItem, FormControl, InputLabel, Stack
+} from '@mui/material';
 import { AuthContext } from '../context/AuthContext';
 import axios from 'axios';
+import { useNavigate } from 'react-router-dom';
 import PersonAddIcon from '@mui/icons-material/PersonAdd';
 import DeleteIcon from '@mui/icons-material/Delete';
 import SettingsIcon from '@mui/icons-material/Settings';
-import VpnKeyIcon from '@mui/icons-material/VpnKey';
 import GroupIcon from '@mui/icons-material/Group';
-import BusinessIcon from '@mui/icons-material/Business';
-
-import { QRCodeSVG } from 'qrcode.react';
-import SecurityIcon from '@mui/icons-material/Security';
-import VideocamOutlinedIcon from '@mui/icons-material/VideocamOutlined';
+import ChatIcon from '@mui/icons-material/Chat';
+import AddIcon from '@mui/icons-material/Add';
+import PersonIcon from '@mui/icons-material/Person';
 
 const AdminManagement = () => {
   const { user, activeWorkspace } = useContext(AuthContext);
+  const navigate = useNavigate();
   const [tab, setTab] = useState(0);
   const [members, setMembers] = useState([]);
   const [clients, setClients] = useState([]);
-  const [attendance, setAttendance] = useState([]);
   const [workspace, setWorkspace] = useState(null);
-  const [openModal, setOpenModal] = useState(false);
-  const [selectedMember, setSelectedMember] = useState(null);
+  const [openClientModal, setOpenClientModal] = useState(false);
+  const [openMemberModal, setOpenMemberModal] = useState(false);
   const [newClient, setNewClient] = useState({ name: '', secretCode: '', password: '' });
+  const [newMemberEmail, setNewMemberEmail] = useState('');
   const [workspaceName, setWorkspaceName] = useState('');
+  const [workspaceDesc, setWorkspaceDesc] = useState('');
   const [msg, setMsg] = useState({ type: '', text: '' });
+  const [loading, setLoading] = useState(false);
 
   const fetchData = async () => {
+    const rawId = activeWorkspace || user?.workspaces?.[0];
+    if (!rawId) return;
+    
+    setLoading(true);
     try {
-      const workspaceId = activeWorkspace || user.workspaces?.[0];
-      if (!workspaceId) {
-        setMsg({ type: 'error', text: 'Please select a workspace first' });
-        return;
-      }
-      const [memRes, clientRes, attRes, wpRes] = await Promise.all([
+      const workspaceId = rawId;
+      const [wpRes, memRes, clientRes] = await Promise.allSettled([
+        axios.get('/api/workspaces'),
         axios.get(`/api/workspaces/${workspaceId}/members`),
-        axios.get(`/api/auth/clients/${workspaceId}`),
-        axios.get(`/api/attendance/${workspaceId}`),
-        axios.get('/api/workspaces')
+        axios.get(`/api/auth/clients/${workspaceId}`)
       ]);
-      setMembers(memRes.data);
-      setClients(clientRes.data || []);
-      setAttendance(attRes.data || []);
-      if (memRes.data.length > 0 && !selectedMember) {
-        setSelectedMember(memRes.data[0]);
+
+      if (wpRes.status === 'fulfilled') {
+        const activeWp = wpRes.value.data.find(w => w._id === workspaceId);
+        if (activeWp) { 
+          setWorkspace(activeWp); 
+          setWorkspaceName(activeWp.name); 
+          setWorkspaceDesc(activeWp.description || '');
+        }
       }
-      const activeWp = wpRes.data.find(w => w._id === workspaceId) || wpRes.data[0];
-      setWorkspace(activeWp);
-      setWorkspaceName(activeWp?.name || '');
+      if (memRes.status === 'fulfilled') setMembers(Array.isArray(memRes.value.data) ? memRes.value.data : []);
+      if (clientRes.status === 'fulfilled') setClients(Array.isArray(clientRes.value.data) ? clientRes.value.data : []);
     } catch (err) {
-      console.error('Fetch failed', err);
+      console.error(err);
+    } finally {
+      setLoading(false);
     }
   };
 
   useEffect(() => {
     if (user) fetchData();
-  }, [user, activeWorkspace]);
-
-  const handleRoleChange = async (memberId, currentRole) => {
-    try {
-      const workspaceId = workspace?._id || user.workspaces?.[0];
-      const newRole = currentRole === 'Admin' ? 'Member' : 'Admin';
-      await axios.put(`/api/workspaces/${workspaceId}/members/${memberId}/role`, { role: newRole });
-      setMsg({ type: 'success', text: 'Role updated successfully' });
-      fetchData();
-    } catch (err) {
-      setMsg({ type: 'error', text: 'Failed to update role' });
-    }
-  };
+  }, [user, activeWorkspace, tab]);
 
   const handleAddClient = async () => {
     try {
-      const workspaceId = workspace?._id || user.workspaces?.[0] || localStorage.getItem('activeWorkspace');
-      if (!workspaceId) {
-        setMsg({ type: 'error', text: 'Please select a workspace first' });
-        return;
-      }
+      const workspaceId = activeWorkspace || user.workspaces?.[0];
       await axios.post('/api/auth/clients', { ...newClient, workspaceId });
-      setMsg({ type: 'success', text: 'Client Onboarded! Secret Code: ' + newClient.secretCode });
-      setOpenModal(false);
+      setMsg({ type: 'success', text: 'Client added successfully!' });
+      setOpenClientModal(false);
       setNewClient({ name: '', secretCode: '', password: '' });
       fetchData();
     } catch (err) {
-      setMsg({ type: 'error', text: 'Failed to onboard client' });
+      const errorMsg = err.response?.data?.message || 'Failed to add client';
+      setMsg({ type: 'error', text: errorMsg });
+    }
+  };
+
+  const handleAddMember = async () => {
+    try {
+      const workspaceId = activeWorkspace || user.workspaces?.[0];
+      await axios.post(`/api/workspaces/join`, { inviteCode: workspace?.inviteCode }); // For simplicity, using invite code logic
+      setMsg({ type: 'success', text: 'Invitation logic triggered (Simulation)' });
+      setOpenMemberModal(false);
+      setNewMemberEmail('');
+      fetchData();
+    } catch (err) {
+      const errorMsg = err.response?.data?.message || 'Failed to add member';
+      setMsg({ type: 'error', text: errorMsg });
+    }
+  };
+
+  const handleUpdateWorkspace = async () => {
+    try {
+      const workspaceId = activeWorkspace || user.workspaces?.[0];
+      await axios.put(`/api/workspaces/${workspaceId}`, { name: workspaceName, description: workspaceDesc });
+      setMsg({ type: 'success', text: 'Workspace updated!' });
+      fetchData();
+    } catch (err) {
+      setMsg({ type: 'error', text: 'Failed to update workspace' });
     }
   };
 
   const handleRemoveUser = async (id) => {
-    if (!window.confirm('Remove this user?')) return;
+    if (!window.confirm('Remove this user from workspace?')) return;
     try {
       await axios.delete(`/api/users/${id}`);
       setMsg({ type: 'success', text: 'User removed' });
@@ -97,263 +113,138 @@ const AdminManagement = () => {
     }
   };
 
-  const handleUpdateWorkspace = async () => {
-    try {
-      const workspaceId = activeWorkspace || user.workspaces?.[0];
-      await axios.put(`/api/workspaces/${workspaceId}`, { name: workspaceName });
-      setMsg({ type: 'success', text: 'Workspace updated successfully!' });
-      fetchData();
-    } catch (err) {
-      setMsg({ type: 'error', text: 'Failed to update workspace' });
-    }
-  };
-
-  const handleExport = () => {
-    const memberAttendance = attendance.filter(a => a.user?._id === selectedMember?._id);
-    if (memberAttendance.length === 0) {
-      setMsg({ type: 'error', text: 'No data to export' });
-      return;
-    }
-
-    const headers = ['Date', 'Clock In', 'Clock Out', 'Total Hours', 'Work Summary'];
-    const rows = memberAttendance.map(log => {
-      const diff = log.clockOut ? (new Date(log.clockOut) - new Date(log.clockIn)) : 0;
-      const hours = Math.floor(diff / (1000 * 60 * 60));
-      const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-      const totalTime = log.clockOut ? `${hours}h ${minutes}m` : 'Active';
-      
-      return [
-        new Date(log.date).toISOString().split('T')[0],
-        log.clockIn ? new Date(log.clockIn).toLocaleTimeString([], { hour12: true }) : '--',
-        log.clockOut ? new Date(log.clockOut).toLocaleTimeString([], { hour12: true }) : 'Working',
-        totalTime,
-        `"${(log.workSummary || '').replace(/"/g, '""').replace(/\n/g, '; ')}"`
-      ].join(',');
-    });
-
-    const csvContent = '\uFEFF' + [headers.join(','), ...rows].join('\n');
-    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
-    const link = document.createElement('a');
-    const url = URL.createObjectURL(blob);
-    link.setAttribute('href', url);
-    link.setAttribute('download', `Attendance_${selectedMember?.name || 'Report'}.csv`);
-    link.style.visibility = 'hidden';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-  };
-
   return (
-    <Box sx={{ p: 4, backgroundColor: '#f8f9fd', minHeight: '100vh' }}>
+    <Box sx={{ p: 4, backgroundColor: '#fcfcfc', minHeight: '100vh' }}>
       <Box sx={{ mb: 5, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
         <Box>
-          <Typography variant="h4" sx={{ fontWeight: 900, color: '#1a202c' }}>Admin Control Center</Typography>
-          <Typography variant="body1" sx={{ color: '#718096' }}>Manage users, clients, and global settings</Typography>
+          <Typography variant="h4" sx={{ fontWeight: 900, color: '#1a202c' }}>Workspace Management</Typography>
+          <Typography variant="body1" sx={{ color: '#718096' }}>Configure your workspace and manage team access</Typography>
         </Box>
-        <Button variant="contained" startIcon={<PersonAddIcon />} onClick={() => setOpenModal(true)} sx={{ backgroundColor: '#5a67d8', borderRadius: 3, fontWeight: 700, px: 3, py: 1.2 }}>Onboard Client</Button>
       </Box>
 
-      {msg.text && <Alert severity={msg.type} sx={{ mb: 3, borderRadius: 3 }}>{msg.text}</Alert>}
+      {msg.text && <Alert severity={msg.type} sx={{ mb: 3, borderRadius: 3 }} onClose={() => setMsg({text:'', type:''})}>{msg.text}</Alert>}
 
-      <Paper sx={{ borderRadius: 5, overflow: 'hidden', boxShadow: '0 4px 25px rgba(0,0,0,0.06)', border: '1px solid #e2e8f0' }}>
-        <Tabs value={tab} onChange={(e, v) => setTab(v)} sx={{ backgroundColor: '#ffffff', borderBottom: '1px solid #edf2f7', '& .MuiTab-root': { py: 2.5, fontWeight: 700, textTransform: 'none', fontSize: '0.95rem' } }}>
+      <Paper sx={{ borderRadius: 5, overflow: 'hidden', border: '1px solid #e2e8f0', boxShadow: '0 4px 25px rgba(0,0,0,0.05)' }}>
+        <Tabs value={tab} onChange={(e, v) => setTab(v)} sx={{ borderBottom: '1px solid #edf2f7', px: 2, '& .MuiTab-root': { py: 3, fontWeight: 800, textTransform: 'none', fontSize: '1rem' } }}>
           <Tab icon={<GroupIcon sx={{ mr: 1 }} />} iconPosition="start" label="Team Members" />
-          <Tab icon={<VideocamOutlinedIcon sx={{ mr: 1 }} />} iconPosition="start" label="Attendance Tracker" />
-          <Tab icon={<BusinessIcon sx={{ mr: 1 }} />} iconPosition="start" label="Client Management" />
+          <Tab icon={<PersonIcon sx={{ mr: 1 }} />} iconPosition="start" label="Workspace Clients" />
           <Tab icon={<SettingsIcon sx={{ mr: 1 }} />} iconPosition="start" label="Workspace Settings" />
         </Tabs>
 
         <Box sx={{ p: 4 }}>
-          {tab === 0 && (
-            <TableContainer>
-              <Table>
-                <TableHead sx={{ backgroundColor: '#f7fafc' }}><TableRow>
-                  <TableCell sx={{ fontWeight: 800 }}>Member</TableCell>
-                  <TableCell sx={{ fontWeight: 800 }}>Role</TableCell>
-                  <TableCell sx={{ fontWeight: 800 }}>Department</TableCell>
-                  <TableCell align="right" sx={{ fontWeight: 800 }}>Actions</TableCell>
-                </TableRow></TableHead>
-                <TableBody>
-                  {members.map((m) => (
-                    <TableRow key={m._id} hover>
-                      <TableCell>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-                          <Avatar src={m.profileImage} sx={{ width: 40, height: 40, borderRadius: 2 }} />
-                          <Box>
-                            <Typography variant="subtitle2" sx={{ fontWeight: 800 }}>{m.name}</Typography>
-                            <Typography variant="caption" color="textSecondary">{m.email}</Typography>
-                          </Box>
-                        </Box>
-                      </TableCell>
-                      <TableCell>
-                        <Chip 
-                          label={m.role} 
-                          size="small" 
-                          sx={{ fontWeight: 700, backgroundColor: m.role === 'Admin' ? '#ebf4ff' : '#f7fafc', color: m.role === 'Admin' ? '#5a67d8' : '#718096' }} 
-                        />
-                      </TableCell>
-                      <TableCell>{m.department || 'General Team'}</TableCell>
-                      <TableCell align="right">
-                        {user?._id !== m._id && (
-                          <>
-                            <Tooltip title="Change Role"><IconButton size="small" onClick={() => handleRoleChange(m._id, m.role)} sx={{ mr: 1 }}><SecurityIcon fontSize="small" /></IconButton></Tooltip>
-                            <Tooltip title="Remove User"><IconButton size="small" color="error" onClick={() => handleRemoveUser(m._id)}><DeleteIcon fontSize="small" /></IconButton></Tooltip>
-                          </>
-                        )}
-                      </TableCell>
-                    </TableRow>
-                  ))}
-                </TableBody>
-              </Table>
-            </TableContainer>
-          )}
-
-          {tab === 1 && (
-            <Grid container spacing={4}>
-              <Grid item xs={12} md={4}>
-                <Typography variant="h6" sx={{ fontWeight: 800, mb: 2 }}>Member List</Typography>
-                <List sx={{ backgroundColor: '#f8fafc', borderRadius: 4, p: 1 }}>
-                  {members.map(m => {
-                    const isActive = attendance.some(a => a.user?._id === m._id && !a.clockOut);
-                    return (
-                      <ListItemButton key={m._id} selected={selectedMember?._id === m._id} onClick={() => setSelectedMember(m)} sx={{ borderRadius: 3, mb: 0.5, py: 1.5 }}>
-                        <ListItemAvatar>
-                          <Badge overlap="circular" anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }} variant="dot" invisible={!isActive} sx={{ '& .MuiBadge-badge': { backgroundColor: '#48bb78', border: '2px solid white' } }}>
-                            <Avatar src={m.profileImage} sx={{ borderRadius: 2 }} />
-                          </Badge>
-                        </ListItemAvatar>
-                        <ListItemText primary={m.name} secondary={isActive ? 'Currently Clocked In' : m.role} primaryTypographyProps={{ fontWeight: 800 }} />
-                      </ListItemButton>
-                    );
-                  })}
-                </List>
-              </Grid>
-              <Grid item xs={12} md={8}>
-                <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-                  <Typography variant="h6" sx={{ fontWeight: 800 }}>Attendance Sheets: {selectedMember?.name || 'Select Member'}</Typography>
-                  <Button size="small" variant="contained" onClick={handleExport} sx={{ borderRadius: 2, backgroundColor: '#48bb78', color: 'white', fontWeight: 700 }}>Export to Excel</Button>
-                </Box>
-                <TableContainer component={Paper} variant="outlined" sx={{ borderRadius: 4 }}>
-                  <Table>
-                    <TableHead sx={{ backgroundColor: '#f7fafc' }}><TableRow>
-                      <TableCell sx={{ fontWeight: 700 }}>Date</TableCell>
-                      <TableCell sx={{ fontWeight: 700 }}>Clock In</TableCell>
-                      <TableCell sx={{ fontWeight: 700 }}>Clock Out</TableCell>
-                      <TableCell sx={{ fontWeight: 700 }}>Total Hours</TableCell>
-                    </TableRow></TableHead>
-                    <TableBody>
-                      {attendance.filter(a => a.user?._id === selectedMember?._id).map(log => (
-                        <TableRow key={log._id}>
-                          <TableCell sx={{ fontWeight: 600 }}>{new Date(log.date).toLocaleDateString()}</TableCell>
-                          <TableCell>{log.clockIn ? new Date(log.clockIn).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : (log.workSummary ? 'Task Log' : '--')}</TableCell>
-                          <TableCell>
-                            {log.clockOut ? new Date(log.clockOut).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }) : (log.workSummary ? 'Submitted' : <Chip label="Working" size="small" color="success" />)}
-                            {log.workSummary && (
-                              <Tooltip title={<Box sx={{ whiteSpace: 'pre-line', p: 1 }}>{log.workSummary}</Box>}>
-                                <Chip label="View Report" size="small" variant="outlined" sx={{ ml: 1, cursor: 'help', fontWeight: 700 }} />
-                              </Tooltip>
-                            )}
-                          </TableCell>
-                          <TableCell sx={{ fontWeight: 700 }}>
-                            {log.clockOut ? (() => {
-                              const diff = new Date(log.clockOut) - new Date(log.clockIn);
-                              const hours = Math.floor(diff / (1000 * 60 * 60));
-                              const minutes = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-                              return `${hours}h ${minutes}m`;
-                            })() : '--'}
-                          </TableCell>
-                        </TableRow>
-                      ))}
-                      {attendance.filter(a => a.user?._id === selectedMember?._id).length === 0 && <TableRow><TableCell colSpan={4} align="center" sx={{ py: 6, color: '#a0aec0' }}>No attendance records found for this member</TableCell></TableRow>}
-                    </TableBody>
-                  </Table>
-                </TableContainer>
-              </Grid>
-            </Grid>
-          )}
-
-          {tab === 2 && (
-            <Box>
-              <Typography variant="h6" sx={{ fontWeight: 800, mb: 3 }}>Active Clients & Portal Access</Typography>
-              <TableContainer>
-                <Table>
-                  <TableHead sx={{ backgroundColor: '#f7fafc' }}><TableRow>
-                    <TableCell sx={{ fontWeight: 800 }}>Client Name</TableCell>
-                    <TableCell sx={{ fontWeight: 800 }}>Portal Secret ID</TableCell>
-                    <TableCell sx={{ fontWeight: 800 }}>Registration Date</TableCell>
-                    <TableCell align="right" sx={{ fontWeight: 800 }}>Actions</TableCell>
-                  </TableRow></TableHead>
-                  <TableBody>
-                    {clients.map((c) => (
-                      <TableRow key={c._id}>
-                        <TableCell sx={{ fontWeight: 800 }}>{c.name}</TableCell>
-                        <TableCell><Chip icon={<VpnKeyIcon />} label={c.secretCode} variant="outlined" sx={{ fontWeight: 700, borderColor: '#5a67d8', color: '#5a67d8' }} /></TableCell>
-                        <TableCell>{new Date(c.createdAt).toLocaleDateString()}</TableCell>
-                        <TableCell align="right">
-                          <IconButton color="error" onClick={() => handleRemoveUser(c._id)}><DeleteIcon /></IconButton>
-                        </TableCell>
-                      </TableRow>
-                    ))}
-                    {clients.length === 0 && <TableRow><TableCell colSpan={4} align="center" sx={{ py: 6, color: '#a0aec0' }}>No clients have been onboarded yet.</TableCell></TableRow>}
-                  </TableBody>
-                </Table>
-              </TableContainer>
-            </Box>
-          )}
-
-          {tab === 3 && (
-            <Grid container spacing={6}>
-              <Grid item xs={12} md={7}>
-                <Typography variant="h6" sx={{ fontWeight: 800, mb: 4 }}>Workspace Information</Typography>
-                <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
-                  <TextField 
-                    fullWidth 
-                    label="Workspace Name" 
-                    value={workspaceName} 
-                    onChange={(e) => setWorkspaceName(e.target.value)}
-                    variant="outlined" 
-                    InputProps={{ sx: { borderRadius: 3, fontWeight: 600 } }} 
-                  />
-                  <TextField fullWidth label="Invite Code" value={workspace?.inviteCode || ''} disabled variant="outlined" InputProps={{ sx: { borderRadius: 3, fontWeight: 800, letterSpacing: 2 } }} />
-                  <TextField fullWidth label="Admin Contact" value={user?.email || ''} disabled variant="outlined" InputProps={{ sx: { borderRadius: 3 } }} />
-                  <Button 
-                    variant="contained" 
-                    onClick={handleUpdateWorkspace}
-                    sx={{ backgroundColor: '#1a202c', py: 1.5, borderRadius: 3, fontWeight: 700, mt: 2 }}
-                  >
-                    Update Workspace Settings
-                  </Button>
-                </Box>
-              </Grid>
-              <Grid item xs={12} md={5}>
-                <Paper sx={{ p: 4, borderRadius: 5, border: '1px solid #e2e8f0', textAlign: 'center', backgroundColor: '#fcfcfc' }}>
-                  <Typography variant="h6" sx={{ fontWeight: 800, mb: 1 }}>Workspace QR Code</Typography>
-                  <Typography variant="body2" sx={{ color: '#718096', mb: 4 }}>Share this code with your team to let them join instantly.</Typography>
-                  <Box sx={{ p: 3, backgroundColor: 'white', display: 'inline-block', borderRadius: 4, border: '2px solid #edf2f7', mb: 3 }}>
-                    <QRCodeSVG value={workspace?.inviteCode || 'N/A'} size={180} />
+          {loading ? (
+            <Box sx={{ display: 'flex', justifyContent: 'center', py: 10 }}><CircularProgress /></Box>
+          ) : (
+            <>
+              {tab === 0 && (
+                <Box>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                    <Typography variant="h6" sx={{ fontWeight: 900 }}>Team Directory</Typography>
+                    <Button variant="contained" startIcon={<PersonAddIcon />} onClick={() => setOpenMemberModal(true)} sx={{ borderRadius: 3, fontWeight: 700, backgroundColor: '#5a67d8', textTransform: 'none' }}>Add Member</Button>
                   </Box>
-                  <Button variant="outlined" fullWidth sx={{ borderRadius: 3, py: 1, fontWeight: 700 }} onClick={() => { navigator.clipboard.writeText(workspace?.inviteCode); setMsg({ type: 'success', text: 'Invite code copied!' }); }}>Copy Invite Code</Button>
-                </Paper>
-              </Grid>
-            </Grid>
+                  <TableContainer>
+                    <Table>
+                      <TableHead sx={{ backgroundColor: '#f7fafc' }}><TableRow>
+                        <TableCell sx={{ fontWeight: 800 }}>Member Info</TableCell>
+                        <TableCell sx={{ fontWeight: 800 }}>Role</TableCell>
+                        <TableCell align="right" sx={{ fontWeight: 800 }}>Actions</TableCell>
+                      </TableRow></TableHead>
+                      <TableBody>
+                        {members.map((m) => (
+                          <TableRow key={m._id} hover>
+                            <TableCell>
+                              <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
+                                <Avatar src={m.profileImage} sx={{ width: 44, height: 44, borderRadius: 2 }} />
+                                <Box><Typography variant="subtitle2" sx={{ fontWeight: 900 }}>{m.name}</Typography><Typography variant="caption" sx={{ color: '#718096' }}>{m.email}</Typography></Box>
+                              </Box>
+                            </TableCell>
+                            <TableCell><Chip label={m.role} size="small" sx={{ fontWeight: 800, backgroundColor: '#ebf4ff', color: '#5a67d8' }} /></TableCell>
+                            <TableCell align="right">
+                               {user?._id !== m._id && <IconButton color="error" onClick={() => handleRemoveUser(m._id)}><DeleteIcon /></IconButton>}
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                </Box>
+              )}
+
+              {tab === 1 && (
+                <Box>
+                  <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
+                    <Typography variant="h6" sx={{ fontWeight: 900 }}>Client Accounts</Typography>
+                    <Button variant="contained" startIcon={<AddIcon />} onClick={() => setOpenClientModal(true)} sx={{ borderRadius: 3, fontWeight: 700, backgroundColor: '#5a67d8', textTransform: 'none' }}>Add Client</Button>
+                  </Box>
+                  <TableContainer>
+                    <Table>
+                      <TableHead sx={{ backgroundColor: '#f7fafc' }}><TableRow>
+                        <TableCell sx={{ fontWeight: 800 }}>Client Name</TableCell>
+                        <TableCell sx={{ fontWeight: 800 }}>Secret ID</TableCell>
+                        <TableCell align="right" sx={{ fontWeight: 800 }}>Actions</TableCell>
+                      </TableRow></TableHead>
+                      <TableBody>
+                        {clients.map(c => (
+                          <TableRow key={c._id} hover>
+                            <TableCell sx={{ fontWeight: 800 }}>{c.name}</TableCell>
+                            <TableCell><Chip label={c.secretCode} variant="outlined" sx={{ fontWeight: 800, color: '#5a67d8', borderColor: '#5a67d8' }} /></TableCell>
+                            <TableCell align="right">
+                               <IconButton color="primary" onClick={() => navigate('/dms', { state: { selectedUser: c } })}><ChatIcon /></IconButton>
+                               <IconButton color="error" onClick={() => handleRemoveUser(c._id)}><DeleteIcon /></IconButton>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </TableContainer>
+                </Box>
+              )}
+
+              {tab === 2 && (
+                <Box sx={{ maxWidth: 600 }}>
+                  <Typography variant="h6" sx={{ fontWeight: 900, mb: 4 }}>Workspace Configuration</Typography>
+                  <Stack spacing={3}>
+                    <TextField fullWidth label="Display Name" value={workspaceName} onChange={(e) => setWorkspaceName(e.target.value)} variant="outlined" />
+                    <TextField fullWidth multiline rows={3} label="Description / Bio" value={workspaceDesc} onChange={(e) => setWorkspaceDesc(e.target.value)} variant="outlined" />
+                    <Box sx={{ p: 2, borderRadius: 3, backgroundColor: '#f7fafc', border: '1px solid #e2e8f0' }}>
+                       <Typography variant="caption" sx={{ fontWeight: 800, color: '#718096', display: 'block', mb: 1 }}>WORKSPACE INVITE CODE</Typography>
+                       <Typography variant="h6" sx={{ fontWeight: 900, color: '#1a202c', letterSpacing: '2px' }}>{workspace?.inviteCode}</Typography>
+                    </Box>
+                    <Box>
+                      <Button variant="contained" onClick={handleUpdateWorkspace} sx={{ px: 4, py: 1.5, borderRadius: 3, fontWeight: 800, backgroundColor: '#5a67d8', textTransform: 'none' }}>Save Changes</Button>
+                    </Box>
+                  </Stack>
+
+                </Box>
+              )}
+            </>
           )}
         </Box>
       </Paper>
 
-      <Dialog open={openModal} onClose={() => setOpenModal(false)} PaperProps={{ sx: { borderRadius: 5, width: '100%', maxWidth: 450 } }}>
-        <DialogTitle sx={{ fontWeight: 900, px: 4, pt: 4 }}>Onboard New Client</DialogTitle>
-        <DialogContent sx={{ px: 4 }}>
-          <Typography variant="body2" sx={{ color: '#718096', mb: 3 }}>Generate a secure portal ID and password for your client.</Typography>
-          <Box sx={{ display: 'flex', flexDirection: 'column', gap: 3, mt: 1 }}>
-            <TextField label="Client Full Name" fullWidth value={newClient.name} onChange={(e) => setNewClient({...newClient, name: e.target.value})} InputProps={{ sx: { borderRadius: 3 } }} />
-            <TextField label="Secret ID (e.g. CLI-2024)" fullWidth value={newClient.secretCode} onChange={(e) => setNewClient({...newClient, secretCode: e.target.value})} InputProps={{ sx: { borderRadius: 3, fontWeight: 700 } }} />
-            <TextField label="Set Login Password" type="password" fullWidth value={newClient.password} onChange={(e) => setNewClient({...newClient, password: e.target.value})} InputProps={{ sx: { borderRadius: 3 } }} />
+      {/* Invite Member Modal */}
+      <Dialog open={openMemberModal} onClose={() => setOpenMemberModal(false)} PaperProps={{ sx: { borderRadius: 4, p: 1 } }}>
+        <DialogTitle sx={{ fontWeight: 900 }}>Invite Team Member</DialogTitle>
+        <DialogContent sx={{ minWidth: 400, pt: 2 }}>
+          <Typography variant="body2" sx={{ color: '#718096', mb: 3 }}>Share the invite code or enter email to notify them.</Typography>
+          <TextField fullWidth label="Email Address" variant="outlined" value={newMemberEmail} onChange={(e) => setNewMemberEmail(e.target.value)} sx={{ mb: 2 }} />
+          <Box sx={{ p: 2, bgcolor: '#f8fafc', borderRadius: 2, textAlign: 'center', border: '1px dashed #cbd5e0' }}>
+            <Typography variant="caption" sx={{ color: '#718096', fontWeight: 800 }}>SHARE INVITE CODE</Typography>
+            <Typography variant="h5" sx={{ fontWeight: 900, color: '#5a67d8', mt: 1 }}>{workspace?.inviteCode}</Typography>
           </Box>
         </DialogContent>
-        <DialogActions sx={{ p: 4 }}>
-          <Button onClick={() => setOpenModal(false)} sx={{ color: '#718096', fontWeight: 700 }}>Cancel</Button>
-          <Button variant="contained" onClick={handleAddClient} sx={{ backgroundColor: '#5a67d8', borderRadius: 3, px: 4, py: 1.2, fontWeight: 700 }}>Generate & Save</Button>
-        </DialogActions>
+        <DialogActions sx={{ px: 3, pb: 2 }}><Button onClick={() => setOpenMemberModal(false)}>Cancel</Button><Button variant="contained" onClick={handleAddMember} sx={{ fontWeight: 700, backgroundColor: '#5a67d8' }}>Send Invite</Button></DialogActions>
+      </Dialog>
+
+      {/* Onboard Client Modal */}
+      <Dialog open={openClientModal} onClose={() => setOpenClientModal(false)} PaperProps={{ sx: { borderRadius: 4, p: 1 } }}>
+        <DialogTitle sx={{ fontWeight: 900 }}>Onboard New Client</DialogTitle>
+        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 3, pt: 2, minWidth: 400 }}>
+          <TextField label="Full Name" fullWidth value={newClient.name} onChange={(e) => setNewClient({...newClient, name: e.target.value})} />
+          <TextField label="Secret ID" fullWidth value={newClient.secretCode} onChange={(e) => setNewClient({...newClient, secretCode: e.target.value})} />
+          <TextField label="Password" type="password" fullWidth value={newClient.password} onChange={(e) => setNewClient({...newClient, password: e.target.value})} />
+        </DialogContent>
+        <DialogActions sx={{ px: 3, pb: 2 }}><Button onClick={() => setOpenClientModal(false)}>Cancel</Button><Button variant="contained" onClick={handleAddClient} sx={{ fontWeight: 700, backgroundColor: '#5a67d8' }}>Onboard</Button></DialogActions>
       </Dialog>
     </Box>
   );
