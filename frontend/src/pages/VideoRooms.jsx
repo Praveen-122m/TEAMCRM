@@ -247,7 +247,7 @@ const VideoRooms = () => {
                       </Stack>
                     </Box>
                     <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'flex-end', gap: 1 }}>
-                      {(user?._id === room.createdBy?._id || user?.role === 'Admin') && (
+                      {(user?._id === room.createdBy?._id || user?.role?.toLowerCase() === 'admin') && (
                         <IconButton size="small" color="error" onClick={() => handleDeleteMeeting(room._id)} sx={{ backgroundColor: '#fff5f5' }}>
                           <DeleteOutlinedIcon sx={{ fontSize: 20 }} />
                         </IconButton>

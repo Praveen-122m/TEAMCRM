@@ -17,6 +17,13 @@ const ForgotPassword = () => {
 
   const handleRequestReset = async (e) => {
     e.preventDefault();
+    
+    // Validate email format
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    if (!emailRegex.test(email.trim())) {
+      return setError("Please enter a valid email address");
+    }
+
     try {
       const res = await axios.post('/api/auth/forgot-password', { email });
       setMessage(res.data.message);
@@ -29,6 +36,24 @@ const ForgotPassword = () => {
 
   const handleResetPassword = async (e) => {
     e.preventDefault();
+    
+    // Validate password complexity
+    if (newPassword.length < 8) {
+      return setError("Password must be at least 8 characters long.");
+    }
+    if (!/[A-Z]/.test(newPassword)) {
+      return setError("Password must contain at least one uppercase letter (A-Z).");
+    }
+    if (!/[a-z]/.test(newPassword)) {
+      return setError("Password must contain at least one lowercase letter (a-z).");
+    }
+    if (!/[0-9]/.test(newPassword)) {
+      return setError("Password must contain at least one numeric digit (0-9).");
+    }
+    if (!/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?~`]/.test(newPassword)) {
+      return setError("Password must contain at least one special character.");
+    }
+
     try {
       const res = await axios.post('/api/auth/reset-password', { email, newPassword });
       setMessage(res.data.message + '. Redirecting to login...');

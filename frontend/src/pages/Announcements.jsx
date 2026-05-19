@@ -174,7 +174,7 @@ const Announcements = () => {
             onClick={() => setIsModalOpen(true)}
             sx={{ backgroundColor: '#1a202c', borderRadius: 3, fontWeight: 700, px: 3, textTransform: 'none' }}
           >
-            {user.role === 'Client' ? 'Submit New Request' : 'Post Update'}
+            {user.role?.toLowerCase() === 'client' ? 'Submit New Request' : 'Post Update'}
           </Button>
         </Box>
       </Box>
@@ -315,7 +315,7 @@ const Announcements = () => {
       {/* Create Modal */}
       <Modal open={isModalOpen} onClose={() => setIsModalOpen(false)}>
         <Box sx={{ position: 'absolute', top: '50%', left: '50%', transform: 'translate(-50%, -50%)', width: 450, bgcolor: 'background.paper', borderRadius: 6, p: 4 }}>
-          <Typography variant="h6" sx={{ fontWeight: 900, mb: 3 }}>{user.role === 'Client' ? 'Submit New Request' : 'New Update'}</Typography>
+          <Typography variant="h6" sx={{ fontWeight: 900, mb: 3 }}>{user.role?.toLowerCase() === 'client' ? 'Submit New Request' : 'New Update'}</Typography>
           <Box component="form" onSubmit={handleSubmit} sx={{ display: 'flex', flexDirection: 'column', gap: 2.5 }}>
             <TextField fullWidth label="Title / Subject" required value={newAnn.title} onChange={(e) => setNewAnn({...newAnn, title: e.target.value})} sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }} />
             <TextField fullWidth label="Details" multiline rows={4} required value={newAnn.message} onChange={(e) => setNewAnn({...newAnn, message: e.target.value})} sx={{ '& .MuiOutlinedInput-root': { borderRadius: 3 } }} />
@@ -331,7 +331,7 @@ const Announcements = () => {
             <Box sx={{ mt: 2, display: 'flex', gap: 2 }}>
               <Button fullWidth variant="outlined" onClick={() => setIsModalOpen(false)} sx={{ borderRadius: 3, fontWeight: 700 }}>Cancel</Button>
               <Button fullWidth variant="contained" type="submit" sx={{ backgroundColor: '#1a202c', borderRadius: 3, fontWeight: 700 }}>
-                 {user.role === 'Client' ? 'Send to Admin' : 'Post Update'}
+                 {user.role?.toLowerCase() === 'client' ? 'Send to Admin' : 'Post Update'}
               </Button>
             </Box>
           </Box>

@@ -112,6 +112,23 @@ const AdminPanel = () => {
   };
 
   const handleOnboardClient = async () => {
+    // Validate password complexity
+    if (newClient.password.length < 8) {
+      return setMsg({ type: 'error', text: 'Client password must be at least 8 characters long.' });
+    }
+    if (!/[A-Z]/.test(newClient.password)) {
+      return setMsg({ type: 'error', text: 'Client password must contain at least one uppercase letter (A-Z).' });
+    }
+    if (!/[a-z]/.test(newClient.password)) {
+      return setMsg({ type: 'error', text: 'Client password must contain at least one lowercase letter (a-z).' });
+    }
+    if (!/[0-9]/.test(newClient.password)) {
+      return setMsg({ type: 'error', text: 'Client password must contain at least one numeric digit (0-9).' });
+    }
+    if (!/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?~`]/.test(newClient.password)) {
+      return setMsg({ type: 'error', text: 'Client password must contain at least one special character.' });
+    }
+
     try {
       const workspaceId = activeWorkspace || user?.workspaces?.[0];
       await axios.post('/api/auth/clients', { ...newClient, workspaceId });

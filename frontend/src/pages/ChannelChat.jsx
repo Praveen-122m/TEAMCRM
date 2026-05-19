@@ -64,7 +64,7 @@ const ChannelChat = ({ isEmbedded = false }) => {
         const [chRes, memRes, projRes] = await Promise.all([
           axios.get(`/api/channels/${workspaceId}`),
           axios.get(`/api/workspaces/${workspaceId}/members`),
-          user.role === 'Client' ? axios.get(`/api/projects/${workspaceId}`) : Promise.resolve({ data: [] })
+          user.role?.toLowerCase() === 'client' ? axios.get(`/api/projects/${workspaceId}`) : Promise.resolve({ data: [] })
         ]);
         setChannels(chRes.data);
         setMembers(memRes.data);
@@ -321,7 +321,7 @@ const ChannelChat = ({ isEmbedded = false }) => {
             <SearchIcon sx={{ color: '#adb5bd', fontSize: 18, mr: 1 }} />
             <InputBase placeholder="Search..." sx={{ flex: 1, fontSize: '0.8rem' }} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
           </Box>
-          {tabValue === 1 && user.role !== 'Client' && (
+          {tabValue === 1 && user.role?.toLowerCase() !== 'client' && (
             <Button size="small" startIcon={<AddIcon />} onClick={() => setIsModalOpen(true)} sx={{ textTransform: 'none', fontWeight: 700, color: '#5a67d8', fontSize: '0.75rem' }}>Add Channel</Button>
           )}
         </Box>

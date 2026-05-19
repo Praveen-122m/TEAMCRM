@@ -2,6 +2,7 @@ const User = require('../models/User');
 const Workspace = require('../models/Workspace');
 const Channel = require('../models/Channel');
 const { Op } = require('sequelize');
+const { validateEmail, validatePasswordStrength } = require('../utils/validation');
 
 // @desc    Search users by name or email
 // @route   GET /api/users/search
@@ -50,7 +51,12 @@ const updateProfile = async (req, res) => {
     if (!user) return res.status(404).json({ message: 'User not found' });
 
     if (name !== undefined) user.name = name;
-    if (email !== undefined) user.email = email;
+    if (email !== undefined) {
+      if (!validateEmail(email)) {
+        return res.status(400).json({ message: 'Please enter a valid email address' });
+      }
+      user.email = email;
+    }
     if (bio !== undefined) user.bio = bio;
     if (department !== undefined) user.department = department;
     if (profileImage !== undefined) user.profileImage = profileImage;
@@ -152,6 +158,11 @@ const changePassword = async (req, res) => {
 
     const isMatch = await user.matchPassword(currentPassword);
     if (!isMatch) return res.status(400).json({ message: 'Invalid current password' });
+
+    const passwordCheck = validatePasswordStrength(newPassword);
+    if (!passwordCheck.isValid) {
+      return res.status(400).json({ message: passwordCheck.message });
+    }
 
     user.password = newPassword;
     await user.save();

@@ -84,11 +84,32 @@ const Register = () => {
 
   const handleSubmit = async (e) => {
     e.preventDefault();
+    
+    // Validate email format
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    if (!emailRegex.test(email.trim())) {
+      return setError("Please enter a valid email address");
+    }
+
+    // Validate password complexity
+    if (password.length < 8) {
+      return setError("Password must be at least 8 characters long");
+    }
+    if (!/\d/.test(password)) {
+      return setError("Password must contain at least one number");
+    }
+    if (!/[A-Z]/.test(password)) {
+      return setError("Password must contain at least one uppercase letter");
+    }
+    if (!/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?~`]/.test(password)) {
+      return setError("Password must contain at least one special character");
+    }
+
     if (password !== confirmPassword) return setError("Passwords do not match");
     if (!agree) return setError("Please agree to the Terms of Service");
     
     setError('');
-    const res = await register(name, email, password);
+    const res = await register(name, email, password, role);
     if (res.success) {
       navigate('/');
     } else {

@@ -100,6 +100,24 @@ const Settings = () => {
 
   const handleChangePassword = async (e) => {
     e.preventDefault();
+    
+    // Validate password complexity
+    if (passData.new.length < 8) {
+      return setMsg({ type: 'error', text: 'Password must be at least 8 characters long.' });
+    }
+    if (!/[A-Z]/.test(passData.new)) {
+      return setMsg({ type: 'error', text: 'Password must contain at least one uppercase letter (A-Z).' });
+    }
+    if (!/[a-z]/.test(passData.new)) {
+      return setMsg({ type: 'error', text: 'Password must contain at least one lowercase letter (a-z).' });
+    }
+    if (!/[0-9]/.test(passData.new)) {
+      return setMsg({ type: 'error', text: 'Password must contain at least one numeric digit (0-9).' });
+    }
+    if (!/[!@#$%^&*()_+\-=[\]{};':"\\|,.<>/?~`]/.test(passData.new)) {
+      return setMsg({ type: 'error', text: 'Password must contain at least one special character.' });
+    }
+
     if (passData.new !== passData.confirm) return setMsg({ type: 'error', text: 'Passwords do not match' });
     try {
       await axios.put('/api/users/change-password', { currentPassword: passData.current, newPassword: passData.new });
@@ -112,6 +130,12 @@ const Settings = () => {
   };
 
   const handleUpdateSecurity = async () => {
+    // Validate email format
+    const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+    if (!emailRegex.test(profile.email.trim())) {
+      return setMsg({ type: 'error', text: 'Please enter a valid email address.' });
+    }
+
     setSaveLoading(true);
     try {
       const res = await axios.put('/api/users/profile', { email: profile.email, phoneNumber: profile.phoneNumber });

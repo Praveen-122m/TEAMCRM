@@ -72,13 +72,13 @@ const Dashboard = () => {
   };
 
   useEffect(() => {
-    if (user && user.role !== 'Client' && user.role !== 'Admin') {
+    if (user && user.role?.toLowerCase() !== 'client' && user.role?.toLowerCase() !== 'admin') {
       fetchData();
     }
   }, [activeWorkspace, user]);
 
-  if (user?.role === 'Client') return <ClientDashboard />;
-  if (user?.role === 'Admin') return <AdminPanel />;
+  if (user?.role?.toLowerCase() === 'client') return <ClientDashboard />;
+  if (user?.role?.toLowerCase() === 'admin') return <AdminPanel />;
 
   if (loading) return (
     <Box sx={{ display: 'flex', flexDirection: 'column', justifyContent: 'center', alignItems: 'center', height: '100vh', gap: 2 }}>

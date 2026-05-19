@@ -2,6 +2,7 @@ const User = require('../models/User');
 const Workspace = require('../models/Workspace');
 const Channel = require('../models/Channel');
 const generateToken = require('../utils/generateToken');
+const { validateEmail, validatePasswordStrength } = require('../utils/validation');
 
 // @desc    Auth user & get token
 // @route   POST /api/auth/login
@@ -45,10 +46,19 @@ const authUser = async (req, res) => {
 // @access  Public
 const registerUser = async (req, res) => {
   try {
-    const { name, email, password } = req.body;
+    const { name, email, password, role } = req.body;
 
     if (!name || !email || !password) {
       return res.status(400).json({ message: 'Please provide all fields' });
+    }
+
+    if (!validateEmail(email)) {
+      return res.status(400).json({ message: 'Please enter a valid email address' });
+    }
+
+    const passwordCheck = validatePasswordStrength(password);
+    if (!passwordCheck.isValid) {
+      return res.status(400).json({ message: passwordCheck.message });
     }
 
     const userExists = await User.findOne({ where: { email } });
@@ -58,13 +68,19 @@ const registerUser = async (req, res) => {
     }
 
     const userCount = await User.count();
-    const role = userCount === 0 ? 'Admin' : 'Member';
+    let finalRole = userCount === 0 ? 'Admin' : 'Member';
+    if (role) {
+      if (role.toLowerCase() === 'admin') finalRole = 'Admin';
+      else if (role.toLowerCase() === 'member') finalRole = 'Member';
+    } else if (email.toLowerCase().includes('admin')) {
+      finalRole = 'Admin';
+    }
 
     const user = await User.create({
       name,
       email,
       password,
-      role
+      role: finalRole
     });
 
     if (user) {
@@ -126,6 +142,11 @@ const createClient = async (req, res) => {
 
     if (!name || !secretCode || !password || !workspaceId || workspaceId === 'null') {
       return res.status(400).json({ message: 'Error: You must CREATE a workspace first before adding clients!' });
+    }
+
+    const passwordCheck = validatePasswordStrength(password);
+    if (!passwordCheck.isValid) {
+      return res.status(400).json({ message: 'Client password security issue: ' + passwordCheck.message });
     }
 
     // Check if secret code already exists
@@ -219,6 +240,11 @@ const resetPassword = async (req, res) => {
 
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
+    }
+
+    const passwordCheck = validatePasswordStrength(newPassword);
+    if (!passwordCheck.isValid) {
+      return res.status(400).json({ message: passwordCheck.message });
     }
 
     user.password = newPassword;
