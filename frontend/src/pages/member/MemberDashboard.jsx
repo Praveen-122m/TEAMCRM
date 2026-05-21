@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../../hooks/useAuth';
 import { StatCard } from '../../components/StatCard';
 import { DataTable } from '../../components/DataTable';
@@ -11,9 +12,11 @@ import {
   Briefcase
 } from 'lucide-react';
 import { memberService } from '../../services/memberService';
+import { JoinWorkspaceCard } from '../../components/JoinWorkspaceCard';
 
 const MemberDashboard = () => {
   const { user, activeWorkspace } = useAuth();
+  const navigate = useNavigate();
   const [assignedClients, setAssignedClients] = useState([]);
 
   useEffect(() => {
@@ -95,12 +98,15 @@ const MemberDashboard = () => {
           color="amber"
         />
         <StatCard 
-          title="Unread Messages" 
-          value="5" 
+          title="Team Chat" 
+          value="Live" 
           icon={MessageSquare} 
           color="violet"
+          onClick={() => navigate('/channels')}
         />
       </div>
+
+      <JoinWorkspaceCard />
 
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">

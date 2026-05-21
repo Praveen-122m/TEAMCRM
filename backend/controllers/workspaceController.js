@@ -1,6 +1,8 @@
 const Workspace = require('../models/Workspace');
 const User = require('../models/User');
 const Channel = require('../models/Channel');
+const Client = require('../models/Client');
+const { validateEmail, validatePasswordStrength } = require('../utils/validation');
 
 // @desc    Create a workspace
 // @route   POST /api/workspaces
@@ -248,12 +250,164 @@ const getWorkspaceMembers = async (req, res) => {
   }
 };
 
+// @desc    Create client workspace + client login (secret key, email, password)
+// @route   POST /api/workspaces/client-setup
+// @access  Private (Admin)
+const createClientWorkspace = async (req, res) => {
+  try {
+    const {
+      name,
+      description,
+      clientName,
+      email,
+      password,
+      secretCode,
+      companyName,
+    } = req.body;
+
+    if (!name?.trim() || !clientName?.trim() || !email?.trim() || !password) {
+      return res.status(400).json({
+        message: 'Workspace name, client name, email, and password are required',
+      });
+    }
+
+    if (!validateEmail(email)) {
+      return res.status(400).json({ message: 'Please enter a valid client email' });
+    }
+
+    const passwordCheck = validatePasswordStrength(password);
+    if (!passwordCheck.isValid) {
+      return res.status(400).json({ message: passwordCheck.message });
+    }
+
+    const emailExists = await User.findOne({ where: { email: email.trim() } });
+    if (emailExists) {
+      return res.status(400).json({ message: 'Email already in use' });
+    }
+
+    const generatedSecret =
+      secretCode?.trim() ||
+      `CL-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
+
+    const codeExists = await User.findOne({ where: { secretCode: generatedSecret } });
+    if (codeExists) {
+      return res.status(400).json({ message: 'Secret key already in use. Try again.' });
+    }
+
+    const inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+
+    const workspace = await Workspace.create({
+      name: name.trim(),
+      description: description?.trim() || '',
+      inviteCode,
+      ownerId: req.user._id,
+      type: 'client',
+    });
+
+    await workspace.addMember(req.user._id);
+    await workspace.addAdmin(req.user._id);
+
+    const channel = await Channel.create({
+      name: 'general',
+      description: 'General discussion for the workspace',
+      workspaceId: workspace._id,
+      isPrivate: false,
+    });
+    await channel.addMember(req.user._id);
+
+    const clientUser = await User.create({
+      name: clientName.trim(),
+      email: email.trim(),
+      password,
+      secretCode: generatedSecret,
+      role: 'Client',
+    });
+
+    const clientProfile = await Client.create({
+      userId: clientUser._id,
+      companyName: companyName || name.trim(),
+      industry: '',
+      contactPerson: clientName.trim(),
+      email: email.trim(),
+      status: 'active',
+    });
+
+    await workspace.addMember(clientUser._id);
+    await channel.addMember(clientUser._id);
+
+    res.status(201).json({
+      workspace,
+      clientCredentials: {
+        email: clientUser.email,
+        secretCode: generatedSecret,
+        password,
+        inviteCode,
+        clientName: clientUser.name,
+      },
+      client: {
+        userId: clientUser._id,
+        clientId: clientProfile._id,
+        name: clientUser.name,
+        email: clientUser.email,
+      },
+    });
+  } catch (error) {
+    console.error('[CREATE_CLIENT_WORKSPACE_ERR]', error);
+    res.status(500).json({ message: 'Failed to create client workspace', error: error.message });
+  }
+};
+
+// @desc    Get the client profile linked to a client workspace
+// @route   GET /api/workspaces/:id/client
+// @access  Private
+const getWorkspaceClient = async (req, res) => {
+  try {
+    const workspace = await Workspace.findByPk(req.params.id);
+    if (!workspace) return res.status(404).json({ message: 'Workspace not found' });
+
+    const isMember = await workspace.hasMember(req.user._id);
+    if (!isMember && req.user.role !== 'Admin') {
+      return res.status(403).json({ message: 'Not a member of this workspace' });
+    }
+
+    const clientUsers = await workspace.getMembers({ where: { role: 'Client' } });
+    if (!clientUsers.length) {
+      return res.status(404).json({ message: 'No client account linked to this workspace yet' });
+    }
+
+    const clientUser = clientUsers[0];
+    const clientProfile = await Client.findOne({ where: { userId: clientUser._id } });
+
+    res.json({
+      user: {
+        _id: clientUser._id,
+        name: clientUser.name,
+        email: clientUser.email,
+        profileImage: clientUser.profileImage,
+        secretCode: clientUser.secretCode,
+      },
+      client: clientProfile,
+      workspace: {
+        _id: workspace._id,
+        name: workspace.name,
+        type: workspace.type,
+        inviteCode: workspace.inviteCode,
+      },
+    });
+  } catch (error) {
+    console.error('[GET_WORKSPACE_CLIENT_ERR]', error);
+    res.status(500).json({ message: 'Server Error', error: error.message });
+  }
+};
+
 module.exports = { 
   createWorkspace, 
+  createClientWorkspace,
   getWorkspaces, 
   joinWorkspace, 
   addMember, 
   getWorkspaceStats,
   getWorkspaceMembers,
+  getWorkspaceClient,
   updateWorkspace
 };

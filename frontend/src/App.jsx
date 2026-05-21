@@ -16,6 +16,7 @@ import WorkspaceDetails from './pages/admin/WorkspaceDetails';
 
 // Member Pages
 import MemberDashboard from './pages/member/MemberDashboard';
+import MemberWorkspaces from './pages/member/MemberWorkspaces';
 
 // Client Pages
 import ClientDashboard from './pages/ClientDashboard';
@@ -27,6 +28,7 @@ import MetaAdsLeads from './pages/MetaAdsLeads';
 import FileManager from './pages/FileManager';
 import DirectMessages from './pages/DirectMessages';
 import Settings from './pages/Settings';
+import ChannelChat from './pages/ChannelChat';
 
 import { useAuth } from './hooks/useAuth';
 import { LoadingSpinner } from './components/LoadingSpinner';
@@ -68,6 +70,7 @@ const App = () => {
       {/* Member Routes */}
       <Route path="/member" element={<Layout allowedRoles={['Member', 'Admin']} />}>
         <Route index element={<MemberDashboard />} />
+        <Route path="workspaces" element={<MemberWorkspaces />} />
       </Route>
 
       {/* Client Routes */}
@@ -82,6 +85,8 @@ const App = () => {
         <Route path="/leads" element={<MetaAdsLeads />} />
         <Route path="/files" element={<FileManager />} />
         <Route path="/messages" element={<DirectMessages />} />
+        <Route path="/dms" element={<Navigate to="/messages" replace />} />
+        <Route path="/channels" element={<ChannelChat />} />
         <Route path="/reports" element={<ReportsPage />} />
         <Route path="/settings" element={<Settings />} />
       </Route>

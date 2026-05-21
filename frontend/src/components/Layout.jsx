@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Outlet, Navigate } from 'react-router-dom';
 import { Sidebar } from './Sidebar';
 import { TopNav } from './TopNav';
+import NotificationPopup from './NotificationPopup';
 import { useAuth } from '../hooks/useAuth';
 import { LoadingSpinner } from './LoadingSpinner';
 
@@ -39,6 +40,7 @@ export const Layout = ({ allowedRoles = [] }) => {
             <Outlet />
           </div>
         </main>
+        <NotificationPopup />
       </div>
     </div>
   );

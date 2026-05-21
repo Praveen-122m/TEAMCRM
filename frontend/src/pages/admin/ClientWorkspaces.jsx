@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import toast from 'react-hot-toast';
 import api from '../../services/api';
+import { workspaceService } from '../../services/workspaceService';
 import { useAuth } from '../../hooks/useAuth';
 
 const ClientWorkspaces = () => {
@@ -22,11 +23,21 @@ const ClientWorkspaces = () => {
   const [createOpen, setCreateOpen] = useState(false);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
+  const [clientName, setClientName] = useState('');
+  const [clientEmail, setClientEmail] = useState('');
+  const [clientPassword, setClientPassword] = useState('');
+  const [secretCode, setSecretCode] = useState('');
   const [creating, setCreating] = useState(false);
   const [copiedId, setCopiedId] = useState(null);
+  const [credentials, setCredentials] = useState(null);
 
-  const { refreshUser } = useAuth();
+  const { refreshUser, setActiveWorkspace } = useAuth();
   const navigate = useNavigate();
+
+  const launchWorkspace = (ws) => {
+    setActiveWorkspace(ws._id, ws.name);
+    navigate(`/admin/client-workspaces/${ws._id}`);
+  };
 
   const fetchWorkspaces = async () => {
     try {
@@ -47,20 +58,29 @@ const ClientWorkspaces = () => {
 
   const handleCreateWorkspace = async (e) => {
     e.preventDefault();
-    if (!name.trim()) return;
+    if (!name.trim() || !clientName.trim() || !clientEmail.trim() || !clientPassword) return;
 
     setCreating(true);
     try {
-      const res = await api.post('/workspaces', { 
-        name: name.trim(), 
-        description: description.trim(), 
-        type: 'client' 
+      const res = await workspaceService.createClientWorkspace({
+        name: name.trim(),
+        description: description.trim(),
+        clientName: clientName.trim(),
+        email: clientEmail.trim(),
+        password: clientPassword,
+        secretCode: secretCode.trim() || undefined,
+        companyName: name.trim(),
       });
-      toast.success('Client workspace created successfully!');
+      setCredentials(res.data.clientCredentials);
+      toast.success('Client workspace & login created!');
       setName('');
       setDescription('');
+      setClientName('');
+      setClientEmail('');
+      setClientPassword('');
+      setSecretCode('');
       setCreateOpen(false);
-      await refreshUser(); // Sync admin status instantly
+      await refreshUser();
       fetchWorkspaces();
     } catch (error) {
       console.error('Error creating workspace:', error);
@@ -68,6 +88,13 @@ const ClientWorkspaces = () => {
     } finally {
       setCreating(false);
     }
+  };
+
+  const copyCredentials = () => {
+    if (!credentials) return;
+    const text = `Client Portal Login\nEmail: ${credentials.email}\nSecret Key: ${credentials.secretCode}\nPassword: ${credentials.password}\nMember Invite Code: ${credentials.inviteCode}`;
+    navigator.clipboard.writeText(text);
+    toast.success('Login details copied for client!');
   };
 
   const copyToClipboard = (text, id) => {
@@ -215,7 +242,7 @@ const ClientWorkspaces = () => {
                   {new Date(ws.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
                 </span>
                 <button 
-                  onClick={() => navigate(`/admin/client-workspaces/${ws._id}`)}
+                  onClick={() => launchWorkspace(ws)}
                   className="text-crm-accent group-hover:text-white font-medium flex items-center gap-1 transition-colors"
                 >
                   Launch Workspace
@@ -248,51 +275,58 @@ const ClientWorkspaces = () => {
             </div>
 
             {/* Form */}
-            <form onSubmit={handleCreateWorkspace} className="space-y-4">
+            <form onSubmit={handleCreateWorkspace} className="space-y-4 max-h-[70vh] overflow-y-auto custom-scrollbar pr-1">
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-crm-textMuted uppercase tracking-wider">
-                  Client Company Name
-                </label>
-                <input
-                  type="text"
-                  placeholder="e.g. Stark Industries, Acme Corp"
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  required
-                  className="w-full bg-crm-darker/60 border border-crm-border hover:border-crm-border/80 focus:border-crm-primary text-white rounded-xl px-4 py-3 text-sm focus:outline-none placeholder-crm-textMuted transition-all"
-                />
+                <label className="text-xs font-semibold text-crm-textMuted uppercase tracking-wider">Workspace / Company Name</label>
+                <input type="text" placeholder="e.g. Stark Industries" value={name} onChange={(e) => setName(e.target.value)} required className="w-full bg-crm-darker/60 border border-crm-border text-white rounded-xl px-4 py-3 text-sm focus:border-crm-primary focus:outline-none" />
               </div>
-
               <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-crm-textMuted uppercase tracking-wider">
-                  Description (Optional)
-                </label>
-                <textarea
-                  placeholder="e.g. Q3 Ad Campaign & Design deliverables"
-                  value={description}
-                  onChange={(e) => setDescription(e.target.value)}
-                  rows={3}
-                  className="w-full bg-crm-darker/60 border border-crm-border hover:border-crm-border/80 focus:border-crm-primary text-white rounded-xl px-4 py-3 text-sm focus:outline-none placeholder-crm-textMuted transition-all resize-none"
-                />
+                <label className="text-xs font-semibold text-crm-textMuted uppercase tracking-wider">Description (Optional)</label>
+                <textarea placeholder="Project scope..." value={description} onChange={(e) => setDescription(e.target.value)} rows={2} className="w-full bg-crm-darker/60 border border-crm-border text-white rounded-xl px-4 py-3 text-sm focus:border-crm-primary focus:outline-none resize-none" />
               </div>
-
+              <p className="text-xs text-violet-300 font-semibold border-t border-crm-border pt-3">Client login (share with client)</p>
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-crm-textMuted uppercase tracking-wider">Client Contact Name</label>
+                <input type="text" placeholder="John Stark" value={clientName} onChange={(e) => setClientName(e.target.value)} required className="w-full bg-crm-darker/60 border border-crm-border text-white rounded-xl px-4 py-3 text-sm focus:border-crm-primary focus:outline-none" />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-crm-textMuted uppercase tracking-wider">Client Email</label>
+                <input type="email" placeholder="client@company.com" value={clientEmail} onChange={(e) => setClientEmail(e.target.value)} required className="w-full bg-crm-darker/60 border border-crm-border text-white rounded-xl px-4 py-3 text-sm focus:border-crm-primary focus:outline-none" />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-crm-textMuted uppercase tracking-wider">Client Password</label>
+                <input type="text" placeholder="Min 8 characters" value={clientPassword} onChange={(e) => setClientPassword(e.target.value)} required className="w-full bg-crm-darker/60 border border-crm-border text-white rounded-xl px-4 py-3 text-sm focus:border-crm-primary focus:outline-none" />
+              </div>
+              <div className="space-y-1.5">
+                <label className="text-xs font-semibold text-crm-textMuted uppercase tracking-wider">Secret Key (optional — auto-generated)</label>
+                <input type="text" placeholder="CL-XXXXXX" value={secretCode} onChange={(e) => setSecretCode(e.target.value.toUpperCase())} className="w-full bg-crm-darker/60 border border-crm-border text-white rounded-xl px-4 py-3 text-sm font-mono focus:border-crm-primary focus:outline-none" />
+              </div>
               <div className="flex justify-end gap-3 pt-2">
-                <button
-                  type="button"
-                  onClick={() => setCreateOpen(false)}
-                  className="px-4 py-2 rounded-lg text-sm text-crm-textMuted hover:text-white hover:bg-crm-border/40 transition-colors"
-                >
-                  Cancel
-                </button>
-                <button
-                  type="submit"
-                  disabled={creating || !name.trim()}
-                  className="px-5 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-lg text-sm font-semibold shadow-md transition-all disabled:opacity-50 disabled:cursor-not-allowed"
-                >
-                  {creating ? 'Creating...' : 'Create'}
+                <button type="button" onClick={() => setCreateOpen(false)} className="px-4 py-2 rounded-lg text-sm text-crm-textMuted hover:text-white">Cancel</button>
+                <button type="submit" disabled={creating || !name.trim() || !clientName.trim() || !clientEmail || !clientPassword} className="px-5 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-lg text-sm font-semibold disabled:opacity-50">
+                  {creating ? 'Creating...' : 'Create Workspace + Client'}
                 </button>
               </div>
             </form>
+          </div>
+        </div>
+      )}
+
+      {credentials && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
+          <div className="glass-panel w-full max-w-md p-6 space-y-4 border border-emerald-500/30">
+            <h2 className="text-xl font-bold text-white">Client Login Details</h2>
+            <p className="text-sm text-crm-textMuted">Copy and send these to your client. They login with <strong>Secret Key + Password</strong>.</p>
+            <div className="space-y-2 text-sm font-mono bg-crm-darker/60 p-4 rounded-xl border border-crm-border">
+              <p><span className="text-crm-textMuted">Email:</span> <span className="text-white">{credentials.email}</span></p>
+              <p><span className="text-crm-textMuted">Secret Key:</span> <span className="text-emerald-400">{credentials.secretCode}</span></p>
+              <p><span className="text-crm-textMuted">Password:</span> <span className="text-white">{credentials.password}</span></p>
+              <p><span className="text-crm-textMuted">Member Invite:</span> <span className="text-white">{credentials.inviteCode}</span></p>
+            </div>
+            <div className="flex gap-3 justify-end">
+              <button type="button" onClick={copyCredentials} className="glass-button text-sm">Copy All</button>
+              <button type="button" onClick={() => setCredentials(null)} className="px-4 py-2 bg-crm-primary text-white rounded-lg text-sm font-semibold">Done</button>
+            </div>
           </div>
         </div>
       )}

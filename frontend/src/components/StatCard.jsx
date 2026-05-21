@@ -1,4 +1,4 @@
-export const StatCard = ({ title, value, icon: Icon, trend, trendValue, color = 'primary' }) => {
+export const StatCard = ({ title, value, icon: Icon, trend, trendValue, color = 'primary', onClick }) => {
   const colorMap = {
     primary: 'bg-indigo-500/10 text-indigo-500 border-indigo-500/20',
     emerald: 'bg-emerald-500/10 text-emerald-500 border-emerald-500/20',
@@ -10,8 +10,16 @@ export const StatCard = ({ title, value, icon: Icon, trend, trendValue, color = 
 
   const iconClasses = colorMap[color] || colorMap.primary;
 
+  const Wrapper = onClick ? 'button' : 'div';
+
   return (
-    <div className="glass-card p-6 flex flex-col h-full relative overflow-hidden group">
+    <Wrapper
+      type={onClick ? 'button' : undefined}
+      onClick={onClick}
+      className={`glass-card p-6 flex flex-col h-full relative overflow-hidden group w-full text-left ${
+        onClick ? 'cursor-pointer hover:border-crm-primary/40 transition-colors' : ''
+      }`}
+    >
       {/* Decorative gradient blob */}
       <div className={`absolute -right-12 -top-12 w-32 h-32 rounded-full blur-3xl opacity-20 group-hover:opacity-40 transition-opacity duration-500 ${colorMap[color]?.split(' ')[0]}`}></div>
       
@@ -35,6 +43,6 @@ export const StatCard = ({ title, value, icon: Icon, trend, trendValue, color = 
           </p>
         </div>
       )}
-    </div>
+    </Wrapper>
   );
 };

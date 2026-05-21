@@ -25,8 +25,13 @@ const OfficeWorkspaces = () => {
   const [creating, setCreating] = useState(false);
   const [copiedId, setCopiedId] = useState(null);
 
-  const { refreshUser } = useAuth();
+  const { refreshUser, setActiveWorkspace } = useAuth();
   const navigate = useNavigate();
+
+  const launchWorkspace = (ws) => {
+    setActiveWorkspace(ws._id, ws.name);
+    navigate(`/admin/office-workspaces/${ws._id}`);
+  };
 
   const fetchWorkspaces = async () => {
     try {
@@ -215,7 +220,7 @@ const OfficeWorkspaces = () => {
                   {new Date(ws.createdAt).toLocaleDateString(undefined, { month: 'short', day: 'numeric', year: 'numeric' })}
                 </span>
                 <button 
-                  onClick={() => navigate(`/admin/office-workspaces/${ws._id}`)}
+                  onClick={() => launchWorkspace(ws)}
                   className="text-crm-primary group-hover:text-white font-medium flex items-center gap-1 transition-colors"
                 >
                   Launch Workspace

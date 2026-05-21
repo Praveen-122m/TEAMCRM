@@ -22,12 +22,14 @@ api.interceptors.request.use(
 api.interceptors.response.use(
   (response) => response,
   (error) => {
-    if (error.response && error.response.status === 401) {
-      // Handle token expiration globally
+    const status = error.response?.status;
+    if (status === 401) {
       localStorage.removeItem('token');
-      localStorage.removeItem('user');
+      localStorage.removeItem('userInfo');
+      localStorage.removeItem('activeWorkspace');
       window.location.href = '/login';
     }
+    // 429 = rate limit — do not logout; let the UI show the error
     return Promise.reject(error);
   }
 );

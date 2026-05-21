@@ -112,6 +112,16 @@ const sendMessage = async (req, res) => {
     const json = populated.toJSON();
     json.reactions = []; // default no reactions
 
+    const io = req.app.get('socketio');
+    if (io) {
+      const { emitChannelMessage, emitDirectMessage } = require('../utils/socketEmit');
+      if (json.isDirectMessage) {
+        emitDirectMessage(io, json);
+      } else if (json.channelId) {
+        emitChannelMessage(io, json);
+      }
+    }
+
     res.status(201).json(json);
   } catch (error) {
     console.error('[SEND_MESSAGE_ERR]', error);
@@ -238,11 +248,18 @@ const getDirectMessages = async (req, res) => {
 const getConversations = async (req, res) => {
   try {
     const userId = req.user._id;
+    const { workspaceId } = req.query;
+
+    const where = {
+      isDirectMessage: true,
+      [Op.or]: [{ senderId: userId }, { receiverId: userId }],
+    };
+    if (workspaceId) {
+      where.workspaceId = workspaceId;
+    }
+
     const messages = await Message.findAll({
-      where: {
-        isDirectMessage: true,
-        [Op.or]: [{ senderId: userId }, { receiverId: userId }]
-      },
+      where,
       include: [
         { model: User, as: 'sender', attributes: ['_id', 'name', 'profileImage'] },
         { model: User, as: 'receiver', attributes: ['_id', 'name', 'profileImage'] }

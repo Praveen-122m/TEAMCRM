@@ -1,13 +1,14 @@
-import React, { useContext, useEffect, useState, useRef, useCallback } from 'react';
+import React, { useContext, useEffect, useState, useRef, useCallback, useMemo } from 'react';
 import { 
   Box, Typography, Paper, Divider, Avatar, TextField, IconButton, List, 
   ListItemButton, ListItemIcon, ListItemText, InputBase, Button, 
   CircularProgress, Tabs, Tab, AvatarGroup, Tooltip, Grid, Card, CardMedia, CardContent, Fade
 } from '@mui/material';
-import { AuthContext } from '../context/AuthContext';
+import { useAuth } from '../hooks/useAuth';
 import { SocketContext } from '../context/SocketContext';
 import { useNavigate, useLocation } from 'react-router-dom';
-import axios from 'axios';
+import api from '../services/api';
+import { resolveMediaUrl, isImageFile, isVideoFile, fileDisplayName } from '../utils/mediaUrl';
 import TagIcon from '@mui/icons-material/Tag';
 import SearchIcon from '@mui/icons-material/Search';
 import SendIcon from '@mui/icons-material/Send';
@@ -21,9 +22,9 @@ import DownloadIcon from '@mui/icons-material/Download';
 import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
 import AlternateEmailIcon from '@mui/icons-material/AlternateEmail';
 
-const ChannelChat = ({ isEmbedded = false }) => {
-  const { user, activeWorkspace } = useContext(AuthContext);
-  const { socket } = useContext(SocketContext);
+const ChannelChat = ({ isEmbedded = false, workspaceId: workspaceIdProp, workspaceName }) => {
+  const { user, activeWorkspace } = useAuth();
+  const { socket, isConnected, clearUnread } = useContext(SocketContext);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -40,6 +41,9 @@ const ChannelChat = ({ isEmbedded = false }) => {
   const [uploading, setUploading] = useState(false);
   const [projects, setProjects] = useState([]);
   const [selectedFile, setSelectedFile] = useState(null);
+  const [workspaceFiles, setWorkspaceFiles] = useState([]);
+
+  const resolvedWorkspaceId = workspaceIdProp || activeWorkspace || user?.workspaces?.[0];
 
   // New: Mentions & Real-time States
   const [showMentions, setShowMentions] = useState(false);
@@ -56,92 +60,134 @@ const ChannelChat = ({ isEmbedded = false }) => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
-  const fetchData = useCallback(async () => {
-    if (!user) return;
+  const fetchWorkspaceFiles = useCallback(async (wsId) => {
+    if (!wsId) return;
     try {
-      const workspaceId = activeWorkspace || user.workspaces?.[0];
-      if (workspaceId) {
-        const [chRes, memRes, projRes] = await Promise.all([
-          axios.get(`/api/channels/${workspaceId}`),
-          axios.get(`/api/workspaces/${workspaceId}/members`),
-          user.role?.toLowerCase() === 'client' ? axios.get(`/api/projects/${workspaceId}`) : Promise.resolve({ data: [] })
-        ]);
-        setChannels(chRes.data);
-        setMembers(memRes.data);
-        setProjects(projRes.data);
-        
-        const targetChannelId = location.state?.activeChannelId;
-        if (targetChannelId) {
-          const target = chRes.data.find(c => c._id === targetChannelId);
-          if (target) {
-            setActiveChannel(target);
-            return;
-          }
-        }
+      const res = await api.get(`/messages/workspace/${wsId}/files`);
+      setWorkspaceFiles(res.data);
+    } catch (err) {
+      console.error('Failed to load workspace files', err);
+    }
+  }, []);
 
-        if (chRes.data.length > 0 && !activeChannel) {
-          setActiveChannel(chRes.data[0]);
+  const fetchData = useCallback(async () => {
+    if (!user || !resolvedWorkspaceId) return;
+    setLoading(true);
+    setActiveChannel(null);
+    setMessages([]);
+    try {
+      const [chRes, memRes, projRes] = await Promise.all([
+        api.get(`/channels/${resolvedWorkspaceId}`),
+        api.get(`/workspaces/${resolvedWorkspaceId}/members`),
+        user.role?.toLowerCase() === 'client'
+          ? api.get(`/projects/${resolvedWorkspaceId}`)
+          : Promise.resolve({ data: [] }),
+      ]);
+      setChannels(chRes.data);
+      setMembers(memRes.data);
+      setProjects(projRes.data);
+      await fetchWorkspaceFiles(resolvedWorkspaceId);
+
+      if (socket?.connected && chRes.data?.length) {
+        socket.emit(
+          'join_channels',
+          chRes.data.map((c) => c._id)
+        );
+      }
+
+      const targetChannelId = location.state?.activeChannelId;
+      if (targetChannelId) {
+        const target = chRes.data.find((c) => c._id === targetChannelId);
+        if (target) {
+          setActiveChannel(target);
+          return;
         }
+      }
+
+      if (chRes.data.length > 0) {
+        setActiveChannel(chRes.data[0]);
       }
     } catch (err) {
       console.error('Fetch error', err);
     } finally {
       setLoading(false);
     }
-  }, [user, activeWorkspace, location.state]);
+  }, [user, resolvedWorkspaceId, location.state, fetchWorkspaceFiles, socket]);
 
   useEffect(() => {
     fetchData();
   }, [fetchData]);
 
-  useEffect(() => {
-    if (activeChannel) {
-      axios.get(`/api/messages/${activeChannel._id}`).then((res) => {
-        setMessages(res.data);
-        setTimeout(scrollToBottom, 100);
-      });
-      if (socket) socket.emit('join_channel', activeChannel._id);
+  const joinActiveChannel = useCallback(() => {
+    if (!socket?.connected || !activeChannel?._id) return;
+    socket.emit('join_channel', activeChannel._id);
+    if (resolvedWorkspaceId) {
+      socket.emit('join_workspace', resolvedWorkspaceId);
     }
-  }, [activeChannel, socket]);
+  }, [socket, activeChannel, resolvedWorkspaceId]);
+
+  useEffect(() => {
+    if (!activeChannel) return;
+    api.get(`/messages/${activeChannel._id}`).then((res) => {
+      setMessages(res.data);
+      setTimeout(scrollToBottom, 100);
+    });
+    joinActiveChannel();
+  }, [activeChannel?._id, joinActiveChannel]);
 
   useEffect(() => {
     if (!socket) return;
-    
-    const messageListener = (newMessage) => {
-      const msgChannelId = newMessage.channelId || newMessage.channel?._id || newMessage.channel;
-      if (activeChannel && activeChannel._id === msgChannelId) {
-        setMessages((prev) => [...prev, newMessage]);
-        scrollToBottom();
+
+    const onConnect = () => {
+      joinActiveChannel();
+      if (channels.length) {
+        socket.emit('join_channels', channels.map((c) => c._id));
       }
     };
 
-    const typingListener = (room) => {
-       // Logic to identify who is typing in this channel would need the user's name from backend
-       // For now, we'll assume the room ID is the channel ID and we can use a generic "Someone is typing"
-       // or we'd need to emit { room, userName } from frontend.
-       // Let's refine the emit to include name.
+    socket.on('connect', onConnect);
+
+    const messageListener = (newMessage) => {
+      const msgChannelId = (
+        newMessage.channelId ||
+        newMessage.channel?._id ||
+        newMessage.channel ||
+        ''
+      ).toString();
+      const activeId = activeChannel?._id?.toString();
+      if (!activeId || msgChannelId !== activeId) return;
+
+      setMessages((prev) => {
+        if (prev.some((m) => m._id === newMessage._id)) return prev;
+        return [...prev, newMessage];
+      });
+      scrollToBottom();
+      if (newMessage.fileUrl) fetchWorkspaceFiles(resolvedWorkspaceId);
+    };
+
+    const onTyping = (room) => {
+      const roomId = (room?._id || room || '').toString();
+      if (activeChannel?._id?.toString() === roomId) setIsTypingRemote(true);
+    };
+
+    const onStopTyping = (room) => {
+      const roomId = (room?._id || room || '').toString();
+      if (activeChannel?._id?.toString() === roomId) setIsTypingRemote(false);
     };
 
     socket.on('message_received', messageListener);
-    
-    socket.on('typing', (room) => {
-      if (activeChannel && room === activeChannel._id) {
-         setIsTypingRemote(true);
-      }
-    });
+    socket.on('typing', onTyping);
+    socket.on('stop_typing', onStopTyping);
 
-    socket.on('stop_typing', (room) => {
-      if (activeChannel && room === activeChannel._id) {
-         setIsTypingRemote(false);
-      }
-    });
+    if (socket.connected) onConnect();
 
     return () => {
+      socket.off('connect', onConnect);
       socket.off('message_received', messageListener);
-      socket.off('typing');
-      socket.off('stop_typing');
+      socket.off('typing', onTyping);
+      socket.off('stop_typing', onStopTyping);
     };
-  }, [socket, activeChannel]);
+  }, [socket, activeChannel, channels, joinActiveChannel, resolvedWorkspaceId, fetchWorkspaceFiles]);
 
   const [isTypingRemote, setIsTypingRemote] = useState(false);
 
@@ -149,16 +195,17 @@ const ChannelChat = ({ isEmbedded = false }) => {
     const value = e.target.value;
     setMessageInput(value);
 
-    // Typing indicator
-    if (!isTyping) {
-      setIsTyping(true);
-      socket.emit('typing', activeChannel?._id);
+    if (socket?.connected && activeChannel?._id) {
+      if (!isTyping) {
+        setIsTyping(true);
+        socket.emit('typing', activeChannel._id);
+      }
+      if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
+      typingTimeoutRef.current = setTimeout(() => {
+        socket.emit('stop_typing', activeChannel._id);
+        setIsTyping(false);
+      }, 2000);
     }
-    if (typingTimeoutRef.current) clearTimeout(typingTimeoutRef.current);
-    typingTimeoutRef.current = setTimeout(() => {
-      socket.emit('stop_typing', activeChannel?._id);
-      setIsTyping(false);
-    }, 2000);
 
     // Mention detection
     const cursorPosition = e.target.selectionStart;
@@ -195,7 +242,9 @@ const ChannelChat = ({ isEmbedded = false }) => {
     if (!messageInput.trim() && !selectedFile) return;
     if (!activeChannel) return;
 
-    socket.emit('stop_typing', activeChannel._id);
+    if (socket?.connected) {
+      socket.emit('stop_typing', activeChannel._id);
+    }
     setIsTyping(false);
 
     let fileData = null;
@@ -204,7 +253,7 @@ const ChannelChat = ({ isEmbedded = false }) => {
       const formData = new FormData();
       formData.append('file', selectedFile.file);
       try {
-        const res = await axios.post('/api/upload', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
+        const res = await api.post('/upload', formData, { headers: { 'Content-Type': 'multipart/form-data' } });
         fileData = { url: res.data.url, type: res.data.format, name: selectedFile.file.name };
       } catch (err) {
         console.error('Upload failed', err);
@@ -223,13 +272,16 @@ const ChannelChat = ({ isEmbedded = false }) => {
       const payload = {
         content: content || (fileData ? `Shared a file: ${fileData.name}` : ''),
         channelId: activeChannel._id,
-        workspaceId: activeWorkspace || user.workspaces?.[0],
+        workspaceId: resolvedWorkspaceId,
         fileUrl: fileData?.url,
         fileType: fileData?.type
       };
-      const res = await axios.post('/api/messages', payload);
-      if (socket) socket.emit('new_message', res.data);
-      setMessages((prev) => [...prev, res.data]);
+      const res = await api.post('/messages', payload);
+      setMessages((prev) => {
+        if (prev.some((m) => m._id === res.data._id)) return prev;
+        return [...prev, res.data];
+      });
+      if (fileData) fetchWorkspaceFiles(resolvedWorkspaceId);
       scrollToBottom();
     } catch (error) {
       console.error('Send Message Error:', error);
@@ -241,9 +293,49 @@ const ChannelChat = ({ isEmbedded = false }) => {
     if (!file) return;
     const reader = new FileReader();
     reader.onload = () => {
-      setSelectedFile({ file, preview: file.type.startsWith('image') ? reader.result : null });
+      const isPreviewable = file.type.startsWith('image') || file.type.startsWith('video');
+      setSelectedFile({ file, preview: isPreviewable ? reader.result : null, isVideo: file.type.startsWith('video') });
     };
     reader.readAsDataURL(file);
+  };
+
+  const renderFileAttachment = (msg) => {
+    const url = resolveMediaUrl(msg.fileUrl);
+    const name = fileDisplayName(msg);
+
+    if (isImageFile(msg.fileType, msg.fileUrl)) {
+      return (
+        <Box sx={{ mt: 1, borderRadius: 2, overflow: 'hidden', border: '1px solid #f0f0f0', backgroundColor: '#f8f9fa', maxWidth: 360 }}>
+          <img src={url} alt={name} style={{ maxWidth: '100%', display: 'block' }} />
+          <Button size="small" fullWidth startIcon={<DownloadIcon />} component="a" href={url} download={name} target="_blank" rel="noopener noreferrer">
+            Download
+          </Button>
+        </Box>
+      );
+    }
+
+    if (isVideoFile(msg.fileType, msg.fileUrl)) {
+      return (
+        <Box sx={{ mt: 1, borderRadius: 2, overflow: 'hidden', border: '1px solid #f0f0f0', backgroundColor: '#f8f9fa', maxWidth: 420 }}>
+          <video src={url} controls style={{ width: '100%', maxHeight: 280, display: 'block' }} />
+          <Button size="small" fullWidth startIcon={<DownloadIcon />} component="a" href={url} download={name} target="_blank" rel="noopener noreferrer">
+            Download Video
+          </Button>
+        </Box>
+      );
+    }
+
+    return (
+      <Box sx={{ mt: 1, p: 1.5, borderRadius: 2, border: '1px solid #e2e8f0', backgroundColor: '#f8f9fa', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2, maxWidth: 360 }}>
+        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0 }}>
+          <InsertDriveFileIcon sx={{ color: '#5a67d8' }} />
+          <Typography variant="body2" sx={{ fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</Typography>
+        </Box>
+        <Button size="small" variant="contained" startIcon={<DownloadIcon />} component="a" href={url} download={name} target="_blank" rel="noopener noreferrer" sx={{ backgroundColor: '#5a67d8', flexShrink: 0 }}>
+          Download
+        </Button>
+      </Box>
+    );
   };
 
   const renderMessageContent = (content) => {
@@ -256,42 +348,58 @@ const ChannelChat = ({ isEmbedded = false }) => {
     });
   };
 
+  const channelFiles = useMemo(() => messages.filter((m) => m.fileUrl), [messages]);
+
   const renderFilesTab = () => {
-    const files = messages.filter(m => m.fileUrl);
+    const files = workspaceFiles.length > 0 ? workspaceFiles : channelFiles;
     return (
       <Box sx={{ p: 3, flexGrow: 1, overflowY: 'auto' }}>
-        <Typography variant="h6" sx={{ fontWeight: 800, mb: 3 }}>Shared Files & Photos</Typography>
+        <Typography variant="h6" sx={{ fontWeight: 800, mb: 1 }}>Shared Files</Typography>
+        <Typography variant="caption" color="textSecondary" sx={{ display: 'block', mb: 3 }}>
+          Images, videos, and documents shared in {activeChannel ? `#${activeChannel.name}` : 'this workspace'}
+        </Typography>
         {files.length === 0 ? (
           <Box sx={{ textAlign: 'center', py: 10 }}>
             <InsertDriveFileIcon sx={{ fontSize: 48, color: '#e2e8f0', mb: 2 }} />
-            <Typography color="textSecondary">No files shared in this channel yet.</Typography>
+            <Typography color="textSecondary">No files shared yet. Attach files from the Chat tab.</Typography>
           </Box>
         ) : (
           <Grid container spacing={2}>
-            {files.map((file, i) => (
-              <Grid item xs={12} sm={6} md={4} lg={3} key={i}>
-                <Card sx={{ borderRadius: 3, border: '1px solid #f0f0f0', boxShadow: 'none', '&:hover': { boxShadow: '0 4px 12px rgba(0,0,0,0.05)' } }}>
-                  {file.fileType?.includes('image') ? (
-                    <CardMedia component="img" height="140" image={file.fileUrl} sx={{ objectFit: 'cover' }} />
-                  ) : (
-                    <Box sx={{ height: 140, backgroundColor: '#f8f9fa', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                      <InsertDriveFileIcon sx={{ fontSize: 40, color: '#adb5bd' }} />
-                    </Box>
-                  )}
-                  <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
-                    <Typography variant="caption" sx={{ fontWeight: 800, display: 'block', mb: 0.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                      {file.content.replace('Shared a file: ', '') || 'Document'}
-                    </Typography>
-                    <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                      <Typography variant="caption" color="textSecondary">{new Date(file.createdAt).toLocaleDateString()}</Typography>
-                      <IconButton size="small" component="a" href={file.fileUrl} download target="_blank" sx={{ color: '#5a67d8' }}>
-                        <DownloadIcon fontSize="small" />
-                      </IconButton>
-                    </Box>
-                  </CardContent>
-                </Card>
-              </Grid>
-            ))}
+            {files.map((file) => {
+              const url = resolveMediaUrl(file.fileUrl);
+              const name = fileDisplayName(file);
+              return (
+                <Grid item xs={12} sm={6} md={4} lg={3} key={file._id}>
+                  <Card sx={{ borderRadius: 3, border: '1px solid #f0f0f0', boxShadow: 'none', '&:hover': { boxShadow: '0 4px 12px rgba(0,0,0,0.05)' } }}>
+                    {isImageFile(file.fileType, file.fileUrl) ? (
+                      <CardMedia component="img" height="140" image={url} sx={{ objectFit: 'cover' }} />
+                    ) : isVideoFile(file.fileType, file.fileUrl) ? (
+                      <Box sx={{ height: 140, backgroundColor: '#000' }}>
+                        <video src={url} style={{ width: '100%', height: 140, objectFit: 'cover' }} />
+                      </Box>
+                    ) : (
+                      <Box sx={{ height: 140, backgroundColor: '#f8f9fa', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <InsertDriveFileIcon sx={{ fontSize: 40, color: '#adb5bd' }} />
+                      </Box>
+                    )}
+                    <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
+                      <Typography variant="caption" sx={{ fontWeight: 800, display: 'block', mb: 0.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
+                        {name}
+                      </Typography>
+                      <Typography variant="caption" color="textSecondary" sx={{ display: 'block', mb: 0.5 }}>
+                        {file.sender?.name || 'Team member'}
+                      </Typography>
+                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                        <Typography variant="caption" color="textSecondary">{new Date(file.createdAt).toLocaleDateString()}</Typography>
+                        <IconButton size="small" component="a" href={url} download={name} target="_blank" rel="noopener noreferrer" sx={{ color: '#5a67d8' }}>
+                          <DownloadIcon fontSize="small" />
+                        </IconButton>
+                      </Box>
+                    </CardContent>
+                  </Card>
+                </Grid>
+              );
+            })}
           </Grid>
         )}
       </Box>
@@ -306,12 +414,18 @@ const ChannelChat = ({ isEmbedded = false }) => {
     <Box sx={{
       display: 'flex',
       height: isEmbedded ? '100%' : 'calc(100vh - 100px)',
-      backgroundColor: '#ffffff',
+      backgroundColor: isEmbedded ? 'transparent' : '#ffffff',
       overflow: 'hidden',
       borderRadius: isEmbedded ? 0 : 4
     }}>
-      {/* Sidebar */}
-      <Box sx={{ width: 280, borderRight: '1px solid #f0f0f0', display: 'flex', flexDirection: 'column' }}>
+      {/* Sidebar — channels */}
+      <Box sx={{ width: 280, borderRight: '1px solid #f0f0f0', display: 'flex', flexDirection: 'column', backgroundColor: isEmbedded ? 'rgba(15,23,42,0.4)' : '#fff' }}>
+        {workspaceName && (
+          <Box sx={{ px: 2, pt: 2, pb: 1 }}>
+            <Typography variant="caption" sx={{ color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1 }}>Workspace</Typography>
+            <Typography variant="subtitle2" sx={{ fontWeight: 800, color: isEmbedded ? '#f8fafc' : '#1a202c' }}>{workspaceName}</Typography>
+          </Box>
+        )}
         <Tabs value={tabValue} onChange={(e, v) => setTabValue(v)} variant="fullWidth" sx={{ borderBottom: '1px solid #f0f0f0', '& .MuiTabs-indicator': { backgroundColor: '#5a67d8', height: 3 } }}>
           <Tab label="Members" sx={{ textTransform: 'none', fontWeight: 600 }} />
           <Tab label="Channels" sx={{ textTransform: 'none', fontWeight: 600 }} />
@@ -321,7 +435,7 @@ const ChannelChat = ({ isEmbedded = false }) => {
             <SearchIcon sx={{ color: '#adb5bd', fontSize: 18, mr: 1 }} />
             <InputBase placeholder="Search..." sx={{ flex: 1, fontSize: '0.8rem' }} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
           </Box>
-          {tabValue === 1 && user.role?.toLowerCase() !== 'client' && (
+          {tabValue === 1 && (user.role === 'Admin' || user.role === 'Member') && (
             <Button size="small" startIcon={<AddIcon />} onClick={() => setIsModalOpen(true)} sx={{ textTransform: 'none', fontWeight: 700, color: '#5a67d8', fontSize: '0.75rem' }}>Add Channel</Button>
           )}
         </Box>
@@ -330,7 +444,12 @@ const ChannelChat = ({ isEmbedded = false }) => {
             <ListItemButton
               key={item._id}
               onClick={() => {
-                tabValue === 1 ? setActiveChannel(item) : navigate('/dms', { state: { selectedUser: item } })
+                if (tabValue === 1) {
+                  setActiveChannel(item);
+                  clearUnread?.(item._id);
+                } else {
+                  navigate('/messages', { state: { selectedUser: item } });
+                }
               }}
               selected={activeChannel?._id === item._id}
               sx={{ borderRadius: 2, mb: 0.5, '&.Mui-selected': { backgroundColor: '#ebf4ff', color: '#5a67d8' } }}
@@ -360,6 +479,16 @@ const ChannelChat = ({ isEmbedded = false }) => {
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
                   <TagIcon sx={{ color: '#5a67d8' }} />
                   <Typography variant="h6" sx={{ fontWeight: 800 }}>{activeChannel.name}</Typography>
+                  <Box
+                    sx={{
+                      width: 8,
+                      height: 8,
+                      borderRadius: '50%',
+                      bgcolor: isConnected ? '#48bb78' : '#fc8181',
+                      ml: 0.5,
+                    }}
+                    title={isConnected ? 'Live — connected' : 'Reconnecting…'}
+                  />
                 </Box>
                 <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
                   <AvatarGroup max={3}>
@@ -380,7 +509,7 @@ const ChannelChat = ({ isEmbedded = false }) => {
                   '& .MuiTabs-indicator': { backgroundColor: '#5a67d8' }
                 }}
               >
-                <Tab label="Posts" />
+                <Tab label="Chat" />
                 <Tab label="Files" />
               </Tabs>
             </Box>
@@ -398,11 +527,7 @@ const ChannelChat = ({ isEmbedded = false }) => {
                           <Typography variant="caption" sx={{ color: '#adb5bd' }}>{new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</Typography>
                         </Box>
                         {msg.fileUrl ? (
-                          <Box sx={{ mt: 1, borderRadius: 2, overflow: 'hidden', border: '1px solid #f0f0f0', backgroundColor: '#f8f9fa' }}>
-                            {msg.fileType?.includes('image') ? (
-                              <Box><img src={msg.fileUrl} style={{ maxWidth: '300px', display: 'block' }} /><Button size="small" fullWidth startIcon={<DownloadIcon />} component="a" href={msg.fileUrl} download target="_blank">Download</Button></Box>
-                            ) : <Button startIcon={<AttachFileIcon />} component="a" href={msg.fileUrl} download target="_blank">Download File</Button>}
-                          </Box>
+                          renderFileAttachment(msg)
                         ) : (
                           <Typography variant="body2" sx={{ color: '#495057' }}>
                             {renderMessageContent(msg.content)}
@@ -449,13 +574,19 @@ const ChannelChat = ({ isEmbedded = false }) => {
 
                   {selectedFile && (
                     <Box sx={{ p: 1.5, backgroundColor: '#f8f9fa', borderRadius: 2, mb: 1, display: 'flex', alignItems: 'center', gap: 2 }}>
-                      {selectedFile.preview ? <img src={selectedFile.preview} style={{ width: 40, height: 40, borderRadius: 4 }} /> : <AttachFileIcon />}
+                      {selectedFile.preview && !selectedFile.isVideo ? (
+                        <img src={selectedFile.preview} alt="" style={{ width: 40, height: 40, borderRadius: 4, objectFit: 'cover' }} />
+                      ) : selectedFile.preview && selectedFile.isVideo ? (
+                        <video src={selectedFile.preview} style={{ width: 56, height: 40, borderRadius: 4 }} />
+                      ) : (
+                        <AttachFileIcon />
+                      )}
                       <Typography variant="caption" sx={{ flexGrow: 1, fontWeight: 700 }}>{selectedFile.file.name}</Typography>
                       <IconButton size="small" onClick={() => setSelectedFile(null)}><CloseIcon fontSize="small" /></IconButton>
                     </Box>
                   )}
                   <Box component="form" onSubmit={handleSendMessage} sx={{ display: 'flex', alignItems: 'center', backgroundColor: '#f8f9fa', borderRadius: 10, px: 2, py: 0.5, border: '1px solid #e2e8f0' }}>
-                    <input type="file" hidden ref={fileInputRef} onChange={handleFileSelect} />
+                    <input type="file" hidden ref={fileInputRef} onChange={handleFileSelect} accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.txt" />
                     <IconButton size="small" onClick={() => fileInputRef.current.click()} disabled={uploading}><AttachFileIcon fontSize="small" /></IconButton>
                     <InputBase 
                       inputRef={inputRef}
@@ -478,11 +609,30 @@ const ChannelChat = ({ isEmbedded = false }) => {
             ) : renderFilesTab()}
           </>
         ) : (
-          <Box sx={{ display: 'flex', alignItems: 'center', justifyContent: 'center', height: '100%' }}><Typography color="textSecondary">Select a channel to begin chatting</Typography></Box>
+          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 2, p: 3 }}>
+            <Typography color="textSecondary" textAlign="center">
+              {channels.length === 0
+                ? 'No channels yet. Create #general or add a new channel.'
+                : 'Select a channel to begin chatting'}
+            </Typography>
+            {(user.role === 'Admin' || user.role === 'Member') && (
+              <Button variant="contained" startIcon={<AddIcon />} onClick={() => setIsModalOpen(true)} sx={{ backgroundColor: '#5a67d8' }}>
+                Create Channel
+              </Button>
+            )}
+          </Box>
         )}
       </Box>
 
-      <CreateChannelModal open={isModalOpen} onClose={() => setIsModalOpen(false)} workspaceId={activeWorkspace || user.workspaces?.[0]} onSuccess={() => fetchData()} />
+      <CreateChannelModal
+        open={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        workspaceId={resolvedWorkspaceId}
+        onSuccess={(newChannel) => {
+          fetchData();
+          if (newChannel) setActiveChannel(newChannel);
+        }}
+      />
       <style>{`
         @keyframes pulse { 0% { opacity: 0.4; } 50% { opacity: 1; } 100% { opacity: 0.4; } }
       `}</style>

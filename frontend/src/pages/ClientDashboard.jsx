@@ -1,86 +1,61 @@
 import { useState, useEffect } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { StatCard } from '../components/StatCard';
-import { SpendChart } from '../components/charts/SpendChart';
-import { LeadsChart } from '../components/charts/LeadsChart';
-import { CampaignPerformance } from '../components/charts/CampaignPerformance';
-import { 
-  Target, 
-  TrendingUp, 
-  DollarSign, 
-  MousePointerClick
+import MetaAdsDashboard from './MetaAdsDashboard';
+import { workspaceService } from '../services/workspaceService';
+import {
+  Target,
+  MessageSquare,
+  Briefcase,
 } from 'lucide-react';
-import { metaService } from '../services/metaService';
 
 const ClientDashboard = () => {
   const { user, activeWorkspace } = useAuth();
-  const [analytics, setAnalytics] = useState(null);
+  const navigate = useNavigate();
+  const [workspaceInfo, setWorkspaceInfo] = useState(null);
+  const workspaceId = activeWorkspace || user?.workspaces?.[0];
 
   useEffect(() => {
-    if (user?._id) {
-      // clientService or metaService call to get client ID linked to this user
-      // Assuming analytics data is fetched here
-      setAnalytics({
-        totalSpend: 4250,
-        totalConversions: 185,
-        totalClicks: 2100,
-        ctr: 2.4,
-        roas: 3.2
-      });
-    }
-  }, [user?._id]);
+    if (!workspaceId) return;
+    workspaceService.getWorkspaceClient(workspaceId).then((res) => {
+      setWorkspaceInfo(res.data);
+    }).catch(() => setWorkspaceInfo(null));
+  }, [workspaceId]);
 
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-end">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-white tracking-tight mb-1">Performance Overview</h1>
-          <p className="text-crm-textMuted">Welcome, {user?.name}. Here is your ad campaign performance.</p>
+          <h1 className="text-3xl font-bold text-white tracking-tight mb-1">Welcome, {user?.name}</h1>
+          <p className="text-crm-textMuted">
+            {workspaceInfo?.workspace?.name
+              ? `Your workspace: ${workspaceInfo.workspace.name}`
+              : 'Your agency client portal'}
+          </p>
+        </div>
+        <div className="flex gap-3">
+          <button type="button" onClick={() => navigate('/channels')} className="glass-button flex items-center gap-2">
+            <MessageSquare size={18} /> Team Chat
+          </button>
+          <button type="button" onClick={() => navigate('/messages')} className="glass-button-secondary flex items-center gap-2">
+            <Target size={18} /> Direct Messages
+          </button>
         </div>
       </div>
 
-      {/* Top Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
-        <StatCard 
-          title="Total Ad Spend" 
-          value={`$${(analytics?.totalSpend || 0).toLocaleString()}`} 
-          icon={DollarSign} 
-          trend="up" 
-          trendValue="12%"
-          color="amber"
-        />
-        <StatCard 
-          title="Conversions/Leads" 
-          value={analytics?.totalConversions || 0} 
-          icon={Target} 
-          trend="up" 
-          trendValue="24%"
-          color="emerald"
-        />
-        <StatCard 
-          title="Clicks" 
-          value={(analytics?.totalClicks || 0).toLocaleString()} 
-          icon={MousePointerClick} 
-          trend="up" 
-          trendValue="8%"
-          color="primary"
-        />
-        <StatCard 
-          title="ROAS" 
-          value={`${analytics?.roas || 0}x`} 
-          icon={TrendingUp} 
-          color="violet"
-        />
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <StatCard title="Workspace" value={workspaceInfo?.workspace?.name?.slice(0, 12) || '—'} icon={Briefcase} color="primary" />
+        <StatCard title="Team Chat" value="Live" icon={MessageSquare} color="emerald" onClick={() => navigate('/channels')} />
+        <StatCard title="Meta Ads" value="View" icon={Target} color="violet" onClick={() => navigate('/meta-ads')} />
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <SpendChart />
-        <LeadsChart />
-      </div>
-      
-      <div className="grid grid-cols-1 gap-6 mt-6">
-        <CampaignPerformance />
-      </div>
+      {workspaceId && user?.clientProfileId && (
+        <div>
+          <h2 className="text-xl font-bold text-white mb-4">Your Meta Ads Performance</h2>
+          <MetaAdsDashboard embedded workspaceId={workspaceId} fixedClientId={user.clientProfileId} clientLabel={user.name} />
+        </div>
+      )}
     </div>
   );
 };

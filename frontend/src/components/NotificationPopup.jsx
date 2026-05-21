@@ -38,10 +38,15 @@ const NotificationPopup = () => {
       
       // Determine if we should skip notification
       let skip = false;
-      if (isDirectMessage && currentPath === '/dms') {
+      if (isDirectMessage && (currentPath === '/messages' || currentPath === '/dms')) {
          skip = true; 
-      } else if (!isDirectMessage && currentPath === '/channels') {
-         skip = true;
+      } else if (
+        !isDirectMessage &&
+        (currentPath === '/channels' ||
+          /\/office-workspaces\/[^/]+$/.test(currentPath) ||
+          /\/client-workspaces\/[^/]+$/.test(currentPath))
+      ) {
+        skip = true;
       }
 
       if (!skip) {
@@ -83,12 +88,12 @@ const NotificationPopup = () => {
   const handleClose = () => setOpen(false);
 
   const handleClick = () => {
-    if (notification.isAnnouncement) {
+    if (notification?.isAnnouncement) {
       navigate('/announcements');
-    } else if (notification.isDirectMessage) {
-      navigate('/dms', { state: { selectedUser: notification.sender } });
+    } else if (notification?.isDirectMessage) {
+      navigate('/messages', { state: { selectedUser: notification.sender } });
     } else {
-      const targetChannelId = notification.channelId || notification.channel;
+      const targetChannelId = notification.channelId || notification.channel?._id || notification.channel;
       navigate('/channels', { state: { activeChannelId: targetChannelId } });
     }
     setOpen(false);

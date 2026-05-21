@@ -8,8 +8,9 @@ import { LeadsChart } from '../components/charts/LeadsChart';
 import { DollarSign, Target, MousePointerClick, Zap, RefreshCw } from 'lucide-react';
 import toast from 'react-hot-toast';
 
-const MetaAdsDashboard = () => {
+const MetaAdsDashboard = ({ embedded = false, workspaceId: propWorkspaceId, fixedClientId, clientLabel }) => {
   const { user, activeWorkspace } = useAuth();
+  const wsId = propWorkspaceId || activeWorkspace;
   const [isConnected, setIsConnected] = useState(false);
   const [analytics, setAnalytics] = useState(null);
   const [loading, setLoading] = useState(true);
@@ -24,20 +25,28 @@ const MetaAdsDashboard = () => {
 
   useEffect(() => {
     const fetchClients = async () => {
-      if (user.role === 'Admin' && activeWorkspace) {
+      if (fixedClientId) {
+        setSelectedClient(fixedClientId);
+        return;
+      }
+      if (user.role === 'Client' && user.clientProfileId) {
+        setSelectedClient(user.clientProfileId);
+        return;
+      }
+      if ((user.role === 'Admin' || user.role === 'Member') && wsId) {
         try {
-          const res = await clientService.getClients(activeWorkspace);
+          const res = await clientService.getClients(wsId);
           setClients(res.data || []);
           if (res.data?.length > 0) {
             setSelectedClient(res.data[0]._id);
           }
         } catch (error) {
-          console.error("Failed to fetch clients");
+          console.error('Failed to fetch clients');
         }
       }
     };
     fetchClients();
-  }, [user.role, activeWorkspace]);
+  }, [user.role, user.clientProfileId, wsId, fixedClientId]);
 
   // In a real app we'd fetch this from the backend based on selectedClient
   useEffect(() => {
@@ -80,7 +89,7 @@ const MetaAdsDashboard = () => {
   const handleConnect = () => {
     // Pass the selected client to connect THEIR specific Meta Ads
     const targetClientId = selectedClient || 'demo-client-id';
-    window.location.href = metaService.getAuthUrl(targetClientId, activeWorkspace);
+    window.location.href = metaService.getAuthUrl(targetClientId, wsId);
   };
 
   const handleSync = async () => {
@@ -116,8 +125,10 @@ const MetaAdsDashboard = () => {
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
         <div>
           <div className="flex items-center gap-4 mb-1">
-            <h1 className="text-3xl font-bold text-white tracking-tight">Meta Ads Analytics</h1>
-            {user.role === 'Admin' && (
+            <h1 className="text-3xl font-bold text-white tracking-tight">
+              {clientLabel ? `${clientLabel} — Meta Ads` : 'Meta Ads Analytics'}
+            </h1>
+            {user.role === 'Admin' && !embedded && !fixedClientId && (
               <select
                 value={selectedClient}
                 onChange={(e) => setSelectedClient(e.target.value)}

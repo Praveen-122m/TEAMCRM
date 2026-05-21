@@ -1,6 +1,7 @@
 const User = require('../models/User');
 const Workspace = require('../models/Workspace');
 const Channel = require('../models/Channel');
+const Client = require('../models/Client');
 const generateToken = require('../utils/generateToken');
 const { validateEmail, validatePasswordStrength } = require('../utils/validation');
 
@@ -19,9 +20,25 @@ const authUser = async (req, res) => {
     }
 
     if (user && (await user.matchPassword(password))) {
-      // Load user workspaces
-      const workspaces = await user.getWorkspaces({ attributes: ['_id'] });
-      const workspaceIds = workspaces.map(w => w._id);
+      const workspaces = await user.getWorkspaces({
+        attributes: ['_id', 'name', 'type', 'inviteCode'],
+      });
+      let workspaceIds = workspaces.map((w) => w._id);
+
+      let clientProfileId = null;
+      let activeWorkspace = workspaceIds[0] || null;
+
+      if (user.role === 'Client') {
+        if (workspaceIds.length === 0) {
+          return res.status(403).json({
+            message: 'No workspace assigned. Contact your agency admin.',
+          });
+        }
+        workspaceIds = [workspaceIds[0]];
+        activeWorkspace = workspaceIds[0];
+        const clientProfile = await Client.findOne({ where: { userId: user._id } });
+        clientProfileId = clientProfile?._id || null;
+      }
 
       res.json({
         _id: user._id,
@@ -30,6 +47,14 @@ const authUser = async (req, res) => {
         role: user.role,
         profileImage: user.profileImage,
         workspaces: workspaceIds,
+        workspacesMeta: workspaces.map((w) => ({
+          _id: w._id,
+          name: w.name,
+          type: w.type,
+          inviteCode: w.inviteCode,
+        })),
+        activeWorkspace,
+        clientProfileId,
         token: generateToken(user._id),
       });
     } else {
@@ -127,8 +152,15 @@ const getUserProfile = async (req, res) => {
   try {
     const user = await User.findByPk(req.user._id);
     if (user) {
-      const workspaces = await user.getWorkspaces({ attributes: ['_id'] });
-      const workspaceIds = workspaces.map(w => w._id);
+      const workspaces = await user.getWorkspaces({
+        attributes: ['_id', 'name', 'type', 'inviteCode'],
+      });
+      const workspaceIds = workspaces.map((w) => w._id);
+      let clientProfileId = null;
+      if (user.role === 'Client') {
+        const clientProfile = await Client.findOne({ where: { userId: user._id } });
+        clientProfileId = clientProfile?._id || null;
+      }
 
       res.json({
         _id: user._id,
@@ -140,7 +172,15 @@ const getUserProfile = async (req, res) => {
         department: user.department,
         statusMessage: user.statusMessage,
         workspaces: workspaceIds,
-        secretCode: user.secretCode
+        workspacesMeta: workspaces.map((w) => ({
+          _id: w._id,
+          name: w.name,
+          type: w.type,
+          inviteCode: w.inviteCode,
+        })),
+        activeWorkspace: user.role === 'Client' ? workspaceIds[0] : null,
+        clientProfileId,
+        secretCode: user.secretCode,
       });
     } else {
       res.status(404).json({ message: 'User not found' });

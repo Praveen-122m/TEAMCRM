@@ -1,39 +1,52 @@
-import { useState } from 'react';
-import { Bell, Search, User, LogOut, Settings, Menu } from 'lucide-react';
+import { useState, useContext } from 'react';
+import { Bell, Search, Settings, LogOut, Menu } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
+import { SocketContext } from '../context/SocketContext';
 
 export const TopNav = ({ onMenuClick }) => {
   const { user, logout } = useAuth();
+  const navigate = useNavigate();
+  const { totalUnread } = useContext(SocketContext) || { totalUnread: 0 };
   const [showProfileMenu, setShowProfileMenu] = useState(false);
 
   return (
     <header className="h-16 border-b border-crm-border bg-crm-card/50 backdrop-blur-md sticky top-0 z-40 flex items-center justify-between px-4 lg:px-8">
       <div className="flex items-center gap-4">
-        <button 
+        <button
           onClick={onMenuClick}
           className="lg:hidden p-2 rounded-lg text-crm-textMuted hover:text-white hover:bg-crm-border/30 transition-colors"
         >
           <Menu size={20} />
         </button>
-        
+
         <div className="hidden md:flex items-center relative">
           <Search className="absolute left-3 text-crm-textMuted" size={18} />
-          <input 
-            type="text" 
-            placeholder="Search campaigns, clients..." 
+          <input
+            type="text"
+            placeholder="Search campaigns, clients..."
             className="glass-input pl-10 w-64 lg:w-96 rounded-full bg-crm-darker/50"
           />
         </div>
       </div>
 
       <div className="flex items-center gap-4">
-        <button className="relative p-2 text-crm-textMuted hover:text-white transition-colors">
+        <button
+          type="button"
+          onClick={() => navigate('/messages')}
+          className="relative p-2 text-crm-textMuted hover:text-white transition-colors"
+          title="Notifications & messages"
+        >
           <Bell size={20} />
-          <span className="absolute top-1 right-1 w-2 h-2 bg-rose-500 rounded-full"></span>
+          {totalUnread > 0 && (
+            <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 bg-rose-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
+              {totalUnread > 9 ? '9+' : totalUnread}
+            </span>
+          )}
         </button>
 
         <div className="relative">
-          <button 
+          <button
             onClick={() => setShowProfileMenu(!showProfileMenu)}
             className="flex items-center gap-3 p-1 pl-3 pr-1 rounded-full border border-crm-border hover:border-crm-primary/50 transition-colors bg-crm-darker/30"
           >
@@ -52,17 +65,17 @@ export const TopNav = ({ onMenuClick }) => {
                 <p className="text-sm font-medium text-white">{user?.name}</p>
                 <p className="text-xs text-crm-textMuted">{user?.role}</p>
               </div>
-              <button 
+              <button
                 onClick={() => {
                   setShowProfileMenu(false);
-                  window.location.href = '/settings';
+                  navigate('/settings');
                 }}
                 className="w-full text-left px-4 py-2 text-sm text-crm-textMuted hover:text-white hover:bg-crm-border/30 flex items-center gap-2 transition-colors"
               >
                 <Settings size={16} />
                 Settings
               </button>
-              <button 
+              <button
                 onClick={logout}
                 className="w-full text-left px-4 py-2 text-sm text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 flex items-center gap-2 transition-colors"
               >

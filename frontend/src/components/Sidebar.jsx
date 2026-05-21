@@ -14,9 +14,12 @@ import {
   Briefcase
 } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
+import { useContext } from 'react';
+import { SocketContext } from '../context/SocketContext';
 
 export const Sidebar = ({ isOpen, onClose }) => {
-  const { user } = useAuth();
+  const { user, activeWorkspace } = useAuth();
+  const { totalUnread } = useContext(SocketContext) || { totalUnread: 0 };
   const role = user?.role || 'Guest';
 
   const menuItems = {
@@ -24,6 +27,7 @@ export const Sidebar = ({ isOpen, onClose }) => {
       { name: 'Dashboard', path: '/admin', icon: LayoutDashboard },
       { name: 'Office Workspaces', path: '/admin/office-workspaces', icon: Building },
       { name: 'Client Workspaces', path: '/admin/client-workspaces', icon: Briefcase },
+      { name: 'Team Chat', path: '/channels', icon: MessageSquare },
       { name: 'Clients', path: '/admin/clients', icon: Users },
       { name: 'Team Members', path: '/admin/members', icon: UserSquare2 },
       { name: 'Meta Ads', path: '/meta-ads', icon: Megaphone },
@@ -35,20 +39,22 @@ export const Sidebar = ({ isOpen, onClose }) => {
     ],
     Member: [
       { name: 'Dashboard', path: '/member', icon: LayoutDashboard },
-      { name: 'Assigned Clients', path: '/member/clients', icon: Users },
+      { name: 'My Workspaces', path: '/member/workspaces', icon: Building },
+      { name: 'Team Chat', path: '/channels', icon: MessageSquare },
+      { name: 'Direct Messages', path: '/messages', icon: Users },
       { name: 'Campaigns', path: '/meta-ads/campaigns', icon: Megaphone },
       { name: 'Leads', path: '/leads', icon: Target },
-      { name: 'Messages', path: '/messages', icon: MessageSquare },
       { name: 'Files', path: '/files', icon: FolderOpen },
     ],
     Client: [
       { name: 'Dashboard', path: '/client', icon: LayoutDashboard },
+      { name: 'Team Chat', path: '/channels', icon: MessageSquare },
+      { name: 'Direct Messages', path: '/messages', icon: Users },
       { name: 'Meta Ads', path: '/meta-ads', icon: Megaphone },
       { name: 'Campaigns', path: '/meta-ads/campaigns', icon: Target },
       { name: 'Leads', path: '/leads', icon: Users },
       { name: 'Reports', path: '/client/reports', icon: BarChart3 },
       { name: 'Files', path: '/files', icon: FolderOpen },
-      { name: 'Messages', path: '/messages', icon: MessageSquare },
     ]
   };
 
@@ -125,7 +131,12 @@ export const Sidebar = ({ isOpen, onClose }) => {
           <div className="bg-gradient-to-br from-crm-darker to-crm-card border border-crm-border rounded-xl p-4 relative overflow-hidden">
             <div className="absolute top-0 right-0 w-16 h-16 bg-crm-primary/20 blur-2xl rounded-full"></div>
             <p className="text-xs text-crm-textMuted mb-2">Workspace</p>
-            <p className="text-sm font-semibold text-white truncate">Main Agency</p>
+            <p className="text-sm font-semibold text-white truncate">
+              {localStorage.getItem('activeWorkspaceName') || 'Select workspace'}
+            </p>
+            {totalUnread > 0 && (
+              <p className="text-[10px] text-rose-400 mt-1">{totalUnread} unread notification(s)</p>
+            )}
           </div>
         </div>
       </aside>

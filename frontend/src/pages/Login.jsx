@@ -27,8 +27,10 @@ const Login = () => {
     );
 
     if (res.success) {
-      // The Layout component will handle role-based redirection
-      navigate('/');
+      if (res.role === 'Client') navigate('/client');
+      else if (res.role === 'Member') navigate('/member');
+      else if (res.role === 'Admin') navigate('/admin');
+      else navigate('/');
     } else {
       setError(res.message);
       setLoading(false);
@@ -48,7 +50,9 @@ const Login = () => {
               <span className="text-white text-3xl font-bold">C</span>
             </div>
             <h2 className="text-3xl font-bold text-white mb-2 tracking-tight">Welcome Back</h2>
-            <p className="text-crm-textMuted">Sign in to AgencyOS</p>
+            <p className="text-crm-textMuted">
+              {useSecretCode ? 'Client portal — use your Secret Key + Password' : 'Sign in to AgencyOS'}
+            </p>
           </div>
 
           {error && (

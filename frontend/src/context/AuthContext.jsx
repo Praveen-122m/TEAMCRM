@@ -18,13 +18,15 @@ export const AuthProvider = ({ children }) => {
       
       // Handle active workspace logic securely
       if (parsedUser.workspaces?.length > 0) {
-        if (activeWorkspace && !parsedUser.workspaces.includes(activeWorkspace)) {
-          setActiveWorkspaceState(parsedUser.workspaces[0]);
-          localStorage.setItem('activeWorkspace', parsedUser.workspaces[0]);
-        } else if (!activeWorkspace) {
-          setActiveWorkspaceState(parsedUser.workspaces[0]);
-          localStorage.setItem('activeWorkspace', parsedUser.workspaces[0]);
-        }
+        const wsIds = parsedUser.workspaces.map((w) => w.toString());
+        const preferred =
+          parsedUser.role === 'Client'
+            ? (parsedUser.activeWorkspace || parsedUser.workspaces[0]).toString()
+            : activeWorkspace && wsIds.includes(activeWorkspace.toString())
+              ? activeWorkspace.toString()
+              : wsIds[0];
+        setActiveWorkspaceState(preferred);
+        localStorage.setItem('activeWorkspace', preferred);
       } else {
         setActiveWorkspaceState(null);
         localStorage.removeItem('activeWorkspace');
@@ -47,12 +49,13 @@ export const AuthProvider = ({ children }) => {
       localStorage.setItem('userInfo', JSON.stringify(data));
       localStorage.setItem('token', data.token);
 
-      if (data.workspaces?.length > 0) {
-        setActiveWorkspaceState(data.workspaces[0]);
-        localStorage.setItem('activeWorkspace', data.workspaces[0]);
+      const wsId = data.activeWorkspace || data.workspaces?.[0];
+      if (wsId) {
+        setActiveWorkspaceState(wsId);
+        localStorage.setItem('activeWorkspace', wsId);
       }
-      
-      return { success: true };
+
+      return { success: true, role: data.role };
     } catch (error) {
       const errorMsg = error.response?.data?.message || (error.message === 'Network Error' ? 'Cannot connect to server. Is the backend running?' : 'Login failed');
       return { success: false, message: errorMsg };

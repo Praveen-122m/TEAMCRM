@@ -2,6 +2,35 @@ const Channel = require('../models/Channel');
 const Workspace = require('../models/Workspace');
 const User = require('../models/User');
 
+/** Ensure #general exists for a workspace */
+const ensureGeneralChannel = async (workspaceId, creatorUserId) => {
+  let channel = await Channel.findOne({
+    where: { workspaceId, name: 'general' },
+  });
+
+  if (!channel) {
+    channel = await Channel.create({
+      name: 'general',
+      description: 'General discussion for the workspace',
+      workspaceId,
+      isPrivate: false,
+    });
+  }
+
+  if (creatorUserId) {
+    try {
+      await channel.addMember(creatorUserId);
+    } catch (err) {
+      // Already a member — ignore duplicate
+      if (!err.message?.includes('unique') && !err.name?.includes('Unique')) {
+        console.warn('[ensureGeneralChannel] addMember:', err.message);
+      }
+    }
+  }
+
+  return channel;
+};
+
 // @desc    Create a channel in a workspace
 // @route   POST /api/channels
 // @access  Private
@@ -9,36 +38,63 @@ const createChannel = async (req, res) => {
   try {
     const { name, description, workspaceId, isPrivate, members } = req.body;
 
+    if (!name?.trim() || !workspaceId) {
+      return res.status(400).json({ message: 'Channel name and workspace are required' });
+    }
+
     const workspace = await Workspace.findByPk(workspaceId);
     if (!workspace) {
       return res.status(404).json({ message: 'Workspace not found' });
     }
 
-    // Verify user is member of workspace
     const isWorkspaceMember = await workspace.hasMember(req.user._id);
-    if (!isWorkspaceMember) {
+    const isAdmin = req.user.role === 'Admin';
+    if (!isWorkspaceMember && !isAdmin) {
       return res.status(403).json({ message: 'Not a member of this workspace' });
     }
 
-    // Combine creator with selected members, ensure unique IDs
-    const memberList = isPrivate 
-      ? Array.from(new Set([...(members || []), req.user._id])) 
+    if (!isWorkspaceMember && isAdmin) {
+      await workspace.addMember(req.user._id);
+    }
+
+    const normalizedName = name.trim().toLowerCase().replace(/\s+/g, '-');
+
+    const existing = await Channel.findOne({
+      where: { workspaceId, name: normalizedName },
+    });
+    if (existing) {
+      return res.status(400).json({ message: 'A channel with this name already exists' });
+    }
+
+    const memberList = isPrivate
+      ? Array.from(new Set([...(members || []), req.user._id]))
       : [req.user._id];
 
     const channel = await Channel.create({
-      name,
-      description,
+      name: normalizedName,
+      description: description || '',
       workspaceId,
-      isPrivate: isPrivate || false
+      isPrivate: !!isPrivate,
     });
 
-    // Add members to channel
-    await channel.addMembers(memberList);
+    for (const memberId of memberList) {
+      try {
+        await channel.addMember(memberId);
+      } catch (err) {
+        if (!err.message?.includes('unique') && !err.name?.includes('Unique')) {
+          throw err;
+        }
+      }
+    }
 
-    res.status(201).json(channel);
+    const populated = await Channel.findByPk(channel._id, {
+      include: [{ model: User, as: 'members', attributes: ['_id', 'name', 'profileImage'] }],
+    });
+
+    res.status(201).json(populated);
   } catch (error) {
     console.error('[CREATE_CHANNEL_ERR]', error);
-    res.status(500).json({ message: 'Server Error', error: error.message });
+    res.status(500).json({ message: 'Failed to create channel', error: error.message });
   }
 };
 
@@ -53,26 +109,35 @@ const getChannels = async (req, res) => {
     }
 
     const isWorkspaceMember = await workspace.hasMember(req.user._id);
-    if (!isWorkspaceMember) {
+    const isAdmin = req.user.role === 'Admin';
+    if (!isWorkspaceMember && !isAdmin) {
       return res.status(403).json({ message: 'Not a member of this workspace' });
     }
 
-    // Fetch channels for the workspace
+    if (!isWorkspaceMember && isAdmin) {
+      await workspace.addMember(req.user._id);
+    }
+
+    await ensureGeneralChannel(req.params.workspaceId, req.user._id);
+
     const channels = await Channel.findAll({
       where: { workspaceId: req.params.workspaceId },
       include: [
         {
           model: User,
           as: 'members',
-          attributes: ['_id']
-        }
-      ]
+          attributes: ['_id', 'name', 'profileImage'],
+        },
+      ],
+      order: [['createdAt', 'ASC']],
     });
 
-    // Filter private channels: only keep public ones OR ones where user is member
-    const filteredChannels = channels.filter(channel => {
+    const userId = req.user._id.toString();
+
+    const filteredChannels = channels.filter((channel) => {
       if (!channel.isPrivate) return true;
-      return channel.members.some(member => member._id === req.user._id);
+      const channelMembers = channel.members || [];
+      return channelMembers.some((member) => member._id.toString() === userId);
     });
 
     res.json(filteredChannels);
@@ -82,4 +147,4 @@ const getChannels = async (req, res) => {
   }
 };
 
-module.exports = { createChannel, getChannels };
+module.exports = { createChannel, getChannels, ensureGeneralChannel };

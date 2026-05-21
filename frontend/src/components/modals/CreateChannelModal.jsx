@@ -1,6 +1,11 @@
 import React, { useState, useEffect } from 'react';
-import { Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Typography, Switch, FormControlLabel, Box, List, ListItem, ListItemAvatar, Avatar, ListItemText, Checkbox, CircularProgress } from '@mui/material';
-import axios from 'axios';
+import {
+  Dialog, DialogTitle, DialogContent, DialogActions, Button, TextField, Typography,
+  Switch, FormControlLabel, Box, List, ListItem, ListItemAvatar, Avatar, ListItemText,
+  Checkbox, CircularProgress,
+} from '@mui/material';
+import toast from 'react-hot-toast';
+import api from '../../services/api';
 
 const CreateChannelModal = ({ open, onClose, workspaceId, onSuccess }) => {
   const [name, setName] = useState('');
@@ -16,10 +21,11 @@ const CreateChannelModal = ({ open, onClose, workspaceId, onSuccess }) => {
       const fetchMembers = async () => {
         setFetchingMembers(true);
         try {
-          const res = await axios.get(`/api/workspaces/${workspaceId}/members`);
+          const res = await api.get(`/workspaces/${workspaceId}/members`);
           setMembers(res.data);
         } catch (err) {
           console.error('Error fetching members:', err);
+          toast.error('Could not load workspace members');
         } finally {
           setFetchingMembers(false);
         }
@@ -29,33 +35,38 @@ const CreateChannelModal = ({ open, onClose, workspaceId, onSuccess }) => {
   }, [open, workspaceId]);
 
   const toggleMember = (id) => {
-    setSelectedMembers(prev => 
-      prev.includes(id) ? prev.filter(m => m !== id) : [...prev, id]
+    setSelectedMembers((prev) =>
+      prev.includes(id) ? prev.filter((m) => m !== id) : [...prev, id]
     );
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     if (!name.trim()) return;
+    if (!workspaceId) {
+      toast.error('No workspace selected');
+      return;
+    }
 
     setLoading(true);
     try {
-      const res = await axios.post('/api/channels', { 
-        name: name.toLowerCase().replace(/\s+/g, '-'), 
-        description, 
+      const res = await api.post('/channels', {
+        name: name.trim().toLowerCase().replace(/\s+/g, '-'),
+        description: description.trim(),
         workspaceId,
         isPrivate,
-        members: selectedMembers
+        members: selectedMembers,
       });
+      toast.success(`Channel #${res.data.name} created`);
       if (onSuccess) onSuccess(res.data);
       onClose();
-      // Reset
       setName('');
       setDescription('');
       setIsPrivate(false);
       setSelectedMembers([]);
     } catch (error) {
       console.error('Error creating channel:', error);
+      toast.error(error.response?.data?.message || 'Failed to create channel');
     } finally {
       setLoading(false);
     }
@@ -93,7 +104,9 @@ const CreateChannelModal = ({ open, onClose, workspaceId, onSuccess }) => {
             label={
               <Box>
                 <Typography variant="subtitle2">Make Private</Typography>
-                <Typography variant="caption" color="text.secondary">Only selected members will see this channel.</Typography>
+                <Typography variant="caption" color="text.secondary">
+                  Only selected members will see this channel.
+                </Typography>
               </Box>
             }
           />
@@ -104,18 +117,20 @@ const CreateChannelModal = ({ open, onClose, workspaceId, onSuccess }) => {
                 Select Members
               </Typography>
               {fetchingMembers ? (
-                <Box sx={{ display: 'flex', justifyContent: 'center', p: 2 }}><CircularProgress size={20} /></Box>
+                <Box sx={{ display: 'flex', justifyContent: 'center', p: 2 }}>
+                  <CircularProgress size={20} />
+                </Box>
               ) : (
-                <List size="small">
+                <List dense>
                   {members.map((m) => (
-                    <ListItem key={m._id} dense button onClick={() => toggleMember(m._id)}>
+                    <ListItem key={m._id} dense onClick={() => toggleMember(m._id)} sx={{ cursor: 'pointer' }}>
                       <ListItemAvatar sx={{ minWidth: 40 }}>
                         <Avatar src={m.profileImage} sx={{ width: 24, height: 24 }} />
                       </ListItemAvatar>
                       <ListItemText primary={m.name} primaryTypographyProps={{ fontSize: '0.85rem' }} />
-                      <Checkbox 
-                        edge="end" 
-                        size="small" 
+                      <Checkbox
+                        edge="end"
+                        size="small"
                         checked={selectedMembers.includes(m._id)}
                         disableRipple
                       />
@@ -128,10 +143,10 @@ const CreateChannelModal = ({ open, onClose, workspaceId, onSuccess }) => {
         </DialogContent>
         <DialogActions sx={{ px: 3, pb: 3 }}>
           <Button onClick={onClose} sx={{ color: '#718096' }}>Cancel</Button>
-          <Button 
-            type="submit" 
-            variant="contained" 
-            disabled={loading || !name.trim()}
+          <Button
+            type="submit"
+            variant="contained"
+            disabled={loading || !name.trim() || !workspaceId}
             sx={{ borderRadius: 2, px: 3, backgroundColor: '#5a67d8', '&:hover': { backgroundColor: '#4c51bf' } }}
           >
             {loading ? 'Creating...' : 'Create Channel'}

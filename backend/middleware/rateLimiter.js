@@ -1,29 +1,43 @@
 const rateLimit = require('express-rate-limit');
 
-/**
- * General API rate limiter
- */
-const apiLimiter = rateLimit({
-  windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS) || 15 * 60 * 1000, // 15 minutes
-  max: parseInt(process.env.RATE_LIMIT_MAX) || 100,
-  message: {
-    message: 'Too many requests from this IP, please try again later.'
-  },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
+const isDev = process.env.NODE_ENV !== 'production';
+const rateLimitDisabled =
+  process.env.DISABLE_RATE_LIMIT === 'true' || isDev;
+
+/** No-op when rate limiting is off (local dev). */
+const noopLimiter = (req, res, next) => next();
 
 /**
- * Strict rate limiter for auth endpoints
+ * General API rate limiter — SPA + chat apps need a higher ceiling.
+ * Disabled in development so admin/member/client panels work without 429 errors.
  */
-const authLimiter = rateLimit({
-  windowMs: 15 * 60 * 1000, // 15 minutes
-  max: 20, // 20 attempts per window
-  message: {
-    message: 'Too many login attempts. Please try again after 15 minutes.'
-  },
-  standardHeaders: true,
-  legacyHeaders: false,
-});
+const apiLimiter = rateLimitDisabled
+  ? noopLimiter
+  : rateLimit({
+      windowMs: parseInt(process.env.RATE_LIMIT_WINDOW_MS, 10) || 15 * 60 * 1000,
+      max: parseInt(process.env.RATE_LIMIT_MAX, 10) || 2000,
+      message: {
+        message: 'Too many requests from this IP, please try again later.',
+      },
+      standardHeaders: true,
+      legacyHeaders: false,
+      skip: (req) => req.method === 'OPTIONS',
+    });
 
-module.exports = { apiLimiter, authLimiter };
+/**
+ * Auth endpoints — stricter in production only.
+ */
+const authLimiter = rateLimitDisabled
+  ? noopLimiter
+  : rateLimit({
+      windowMs: 15 * 60 * 1000,
+      max: parseInt(process.env.AUTH_RATE_LIMIT_MAX, 10) || 50,
+      message: {
+        message: 'Too many login attempts. Please try again after 15 minutes.',
+      },
+      standardHeaders: true,
+      legacyHeaders: false,
+      skip: (req) => req.method === 'OPTIONS',
+    });
+
+module.exports = { apiLimiter, authLimiter, rateLimitDisabled };
