@@ -4,6 +4,7 @@ import { Layout } from './components/Layout';
 // Auth Pages
 import Login from './pages/Login';
 import Register from './pages/Register';
+import ForgotPassword from './pages/ForgotPassword';
 
 // Admin Pages
 import Dashboard from './pages/Dashboard';
@@ -54,6 +55,7 @@ const App = () => {
       {/* Public Routes */}
       <Route path="/login" element={!user ? <Login /> : <Navigate to={getRootRedirect()} />} />
       <Route path="/register" element={!user ? <Register /> : <Navigate to={getRootRedirect()} />} />
+      <Route path="/forgot-password" element={!user ? <ForgotPassword /> : <Navigate to={getRootRedirect()} />} />
       <Route path="/" element={<Navigate to={getRootRedirect()} replace />} />
 
       {/* Admin Routes */}

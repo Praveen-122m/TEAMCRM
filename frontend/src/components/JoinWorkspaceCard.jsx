@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import { Layers, KeyRound } from 'lucide-react';
 import toast from 'react-hot-toast';
 import { workspaceService } from '../services/workspaceService';
@@ -8,6 +9,7 @@ export const JoinWorkspaceCard = ({ onJoined }) => {
   const [inviteCode, setInviteCode] = useState('');
   const [loading, setLoading] = useState(false);
   const { refreshUser, setActiveWorkspace } = useAuth();
+  const navigate = useNavigate();
 
   const handleJoin = async (e) => {
     e.preventDefault();
@@ -15,11 +17,13 @@ export const JoinWorkspaceCard = ({ onJoined }) => {
     setLoading(true);
     try {
       const res = await workspaceService.joinWorkspace(inviteCode.trim().toUpperCase());
+      const ws = res.data;
       await refreshUser();
-      setActiveWorkspace(res.data._id, res.data.name);
-      toast.success(`Joined workspace: ${res.data.name}`);
+      setActiveWorkspace(ws._id, ws.name);
+      toast.success(res.data.message || `Joined workspace: ${ws.name}`);
       setInviteCode('');
-      onJoined?.(res.data);
+      onJoined?.(ws);
+      navigate('/channels', { state: { workspaceId: ws._id } });
     } catch (err) {
       toast.error(err.response?.data?.message || 'Invalid invite code');
     } finally {

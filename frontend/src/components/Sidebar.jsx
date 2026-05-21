@@ -53,7 +53,6 @@ export const Sidebar = ({ isOpen, onClose }) => {
       { name: 'Meta Ads', path: '/meta-ads', icon: Megaphone },
       { name: 'Campaigns', path: '/meta-ads/campaigns', icon: Target },
       { name: 'Leads', path: '/leads', icon: Users },
-      { name: 'Reports', path: '/client/reports', icon: BarChart3 },
       { name: 'Files', path: '/files', icon: FolderOpen },
     ]
   };

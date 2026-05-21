@@ -4,6 +4,7 @@ const Channel = require('../models/Channel');
 const Client = require('../models/Client');
 const generateToken = require('../utils/generateToken');
 const { validateEmail, validatePasswordStrength } = require('../utils/validation');
+const { ensureGeneralChannel } = require('./channelController');
 
 // @desc    Auth user & get token
 // @route   POST /api/auth/login
@@ -71,14 +72,22 @@ const authUser = async (req, res) => {
 // @access  Public
 const registerUser = async (req, res) => {
   try {
-    const { name, email, password, role } = req.body;
+    const { name, email, password, confirmPassword, role } = req.body;
 
-    if (!name || !email || !password) {
+    if (!name?.trim() || !email?.trim() || !password) {
       return res.status(400).json({ message: 'Please provide all fields' });
+    }
+
+    if (name.trim().length < 2) {
+      return res.status(400).json({ message: 'Name must be at least 2 characters' });
     }
 
     if (!validateEmail(email)) {
       return res.status(400).json({ message: 'Please enter a valid email address' });
+    }
+
+    if (confirmPassword !== undefined && password !== confirmPassword) {
+      return res.status(400).json({ message: 'Passwords do not match' });
     }
 
     const passwordCheck = validatePasswordStrength(password);
@@ -86,7 +95,14 @@ const registerUser = async (req, res) => {
       return res.status(400).json({ message: passwordCheck.message });
     }
 
-    const userExists = await User.findOne({ where: { email } });
+    const roleNorm = (role || '').toString().toLowerCase();
+    if (roleNorm === 'client') {
+      return res.status(400).json({
+        message: 'Client accounts are created by your agency administrator.',
+      });
+    }
+
+    const userExists = await User.findOne({ where: { email: email.trim() } });
 
     if (userExists) {
       return res.status(400).json({ message: 'User already exists' });
@@ -94,18 +110,14 @@ const registerUser = async (req, res) => {
 
     const userCount = await User.count();
     let finalRole = userCount === 0 ? 'Admin' : 'Member';
-    if (role) {
-      if (role.toLowerCase() === 'admin') finalRole = 'Admin';
-      else if (role.toLowerCase() === 'member') finalRole = 'Member';
-    } else if (email.toLowerCase().includes('admin')) {
-      finalRole = 'Admin';
-    }
+    if (roleNorm === 'admin') finalRole = 'Admin';
+    else if (roleNorm === 'member') finalRole = 'Member';
 
     const user = await User.create({
-      name,
-      email,
+      name: name.trim(),
+      email: email.trim().toLowerCase(),
       password,
-      role: finalRole
+      role: finalRole,
     });
 
     let workspaceIds = [];
@@ -122,6 +134,7 @@ const registerUser = async (req, res) => {
         // Add them as admin
         await defaultWorkspace.addAdmin(user._id);
         workspaceIds.push(defaultWorkspace._id);
+        await ensureGeneralChannel(defaultWorkspace._id);
       }
 
       res.status(201).json({

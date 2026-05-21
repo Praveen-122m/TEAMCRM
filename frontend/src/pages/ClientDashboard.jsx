@@ -11,10 +11,17 @@ import {
 } from 'lucide-react';
 
 const ClientDashboard = () => {
-  const { user, activeWorkspace } = useAuth();
+  const { user, activeWorkspace, setActiveWorkspace } = useAuth();
   const navigate = useNavigate();
   const [workspaceInfo, setWorkspaceInfo] = useState(null);
-  const workspaceId = activeWorkspace || user?.workspaces?.[0];
+  const workspaceId = user?.workspaces?.[0] || activeWorkspace;
+
+  useEffect(() => {
+    if (user?.role === 'Client' && user?.workspaces?.[0]) {
+      const wsId = user.workspaces[0];
+      setActiveWorkspace(wsId, user.workspacesMeta?.[0]?.name);
+    }
+  }, [user, setActiveWorkspace]);
 
   useEffect(() => {
     if (!workspaceId) return;
@@ -35,7 +42,11 @@ const ClientDashboard = () => {
           </p>
         </div>
         <div className="flex gap-3">
-          <button type="button" onClick={() => navigate('/channels')} className="glass-button flex items-center gap-2">
+          <button
+            type="button"
+            onClick={() => navigate('/channels', { state: { workspaceId } })}
+            className="glass-button flex items-center gap-2"
+          >
             <MessageSquare size={18} /> Team Chat
           </button>
           <button type="button" onClick={() => navigate('/messages')} className="glass-button-secondary flex items-center gap-2">

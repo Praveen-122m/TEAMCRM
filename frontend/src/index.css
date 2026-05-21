@@ -67,3 +67,227 @@
 ::-webkit-scrollbar-thumb:hover {
   @apply bg-crm-textMuted;
 }
+
+/* ── LUXE Login Page ── */
+.login-page {
+  background: #050510;
+}
+
+.login-page-left {
+  background: radial-gradient(ellipse 80% 60% at 20% 50%, rgba(59, 130, 246, 0.08), transparent);
+}
+
+.login-gradient-text {
+  background: linear-gradient(90deg, #60a5fa 0%, #a78bfa 50%, #c084fc 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.login-glow {
+  background: radial-gradient(circle at 70% 50%, rgba(99, 102, 241, 0.35), rgba(139, 92, 246, 0.15) 40%, transparent 70%);
+}
+
+.login-card {
+  background: #f7f8fc;
+  border-radius: 2rem;
+  box-shadow:
+    0 25px 80px rgba(0, 0, 0, 0.45),
+    0 0 0 1px rgba(255, 255, 255, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.login-role-tabs {
+  display: flex;
+  gap: 0.25rem;
+  padding: 0.35rem;
+  background: #e8eaef;
+  border-radius: 9999px;
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.06);
+}
+
+.login-role-tab-active {
+  background: #ffffff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.login-label {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #64748b;
+  margin-bottom: 0.5rem;
+  letter-spacing: 0.02em;
+}
+
+.login-input-wrap {
+  position: relative;
+}
+
+.login-input-icon {
+  position: absolute;
+  left: 1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #94a3b8;
+  pointer-events: none;
+}
+
+.login-input {
+  width: 100%;
+  padding: 0.9rem 1rem 0.9rem 2.75rem;
+  font-size: 0.875rem;
+  color: #1e293b;
+  background: #eef0f4;
+  border: none;
+  border-radius: 0.75rem;
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.08);
+  outline: none;
+  transition: box-shadow 0.2s, background 0.2s;
+}
+
+.login-input::placeholder {
+  color: #94a3b8;
+}
+
+.login-input:focus {
+  background: #e8ebf0;
+  box-shadow:
+    inset 0 2px 6px rgba(0, 0, 0, 0.06),
+    0 0 0 2px rgba(59, 130, 246, 0.35);
+}
+
+.login-toggle {
+  width: 2.25rem;
+  height: 1.25rem;
+  border-radius: 9999px;
+  background: #cbd5e1;
+  position: relative;
+  transition: background 0.2s;
+  flex-shrink: 0;
+}
+
+.login-toggle-on {
+  background: #3b82f6;
+}
+
+.login-toggle-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 50%;
+  background: white;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  transition: transform 0.2s;
+}
+
+.login-toggle-on .login-toggle-knob {
+  transform: translateX(1rem);
+}
+
+.login-submit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 1rem 1.5rem;
+  background: #e8eaef;
+  border: none;
+  border-radius: 0.75rem;
+  box-shadow:
+    0 4px 14px rgba(0, 0, 0, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.login-submit:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow:
+    0 8px 24px rgba(59, 130, 246, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.login-submit:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+/* ── Register Page (centered Silk-style card) ── */
+.register-page {
+  min-height: 100vh;
+  background: radial-gradient(circle at 50% 30%, #0f172a 0%, #020617 55%, #000000 100%);
+}
+
+.register-hero-glow {
+  background: radial-gradient(
+    circle at 50% 40%,
+    rgba(255, 255, 255, 0.12) 0%,
+    rgba(147, 197, 253, 0.08) 25%,
+    transparent 55%
+  );
+}
+
+.register-card {
+  background: #f3f4f8;
+  border-radius: 1.75rem;
+  box-shadow:
+    0 0 60px rgba(255, 255, 255, 0.35),
+    0 0 120px rgba(147, 197, 253, 0.15),
+    0 25px 80px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95);
+}
+
+.register-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem 1.25rem;
+}
+
+@media (max-width: 540px) {
+  .register-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.register-label-upper {
+  display: block;
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: #64748b;
+  margin-bottom: 0.45rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.register-input-plain {
+  width: 100%;
+  padding: 0.85rem 1rem;
+  font-size: 0.875rem;
+  color: #1e293b;
+  background: #eef0f4;
+  border: none;
+  border-radius: 0.75rem;
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.08);
+  outline: none;
+  transition: box-shadow 0.2s, background 0.2s;
+}
+
+.register-input-plain::placeholder {
+  color: #94a3b8;
+}
+
+.register-input-plain:focus {
+  background: #e8ebf0;
+  box-shadow:
+    inset 0 2px 6px rgba(0, 0, 0, 0.06),
+    0 0 0 2px rgba(59, 130, 246, 0.35);
+}
+
+.register-checkbox {
+  width: 1rem;
+  height: 1rem;
+  accent-color: #3b82f6;
+  cursor: pointer;
+}

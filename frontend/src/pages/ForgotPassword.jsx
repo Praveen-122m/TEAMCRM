@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
 import { Box, Button, TextField, Typography, Alert, Paper, Avatar, InputAdornment, IconButton } from '@mui/material';
 import { useNavigate, Link } from 'react-router-dom';
-import axios from 'axios';
+import api from '../services/api';
 import EmailOutlinedIcon from '@mui/icons-material/EmailOutlined';
 import LockOutlinedIcon from '@mui/icons-material/LockOutlined';
 import ArrowBackIcon from '@mui/icons-material/ArrowBack';
@@ -25,7 +25,7 @@ const ForgotPassword = () => {
     }
 
     try {
-      const res = await axios.post('/api/auth/forgot-password', { email });
+      const res = await api.post('/auth/forgot-password', { email });
       setMessage(res.data.message);
       setStep(2);
       setError('');
@@ -55,7 +55,7 @@ const ForgotPassword = () => {
     }
 
     try {
-      const res = await axios.post('/api/auth/reset-password', { email, newPassword });
+      const res = await api.post('/auth/reset-password', { email, newPassword });
       setMessage(res.data.message + '. Redirecting to login...');
       setError('');
       setTimeout(() => navigate('/login'), 3000);

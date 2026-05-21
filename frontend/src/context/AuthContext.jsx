@@ -51,8 +51,12 @@ export const AuthProvider = ({ children }) => {
 
       const wsId = data.activeWorkspace || data.workspaces?.[0];
       if (wsId) {
-        setActiveWorkspaceState(wsId);
-        localStorage.setItem('activeWorkspace', wsId);
+        const wsIdStr = wsId.toString();
+        setActiveWorkspaceState(wsIdStr);
+        localStorage.setItem('activeWorkspace', wsIdStr);
+        if (data.role === 'Client' && data.workspacesMeta?.[0]?.name) {
+          localStorage.setItem('activeWorkspaceName', data.workspacesMeta[0].name);
+        }
       }
 
       return { success: true, role: data.role };
@@ -62,19 +66,26 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const register = async (name, email, password, role = 'Member') => {
+  const register = async (name, email, password, role = 'Member', confirmPassword = '') => {
     try {
-      const { data } = await api.post('/auth/register', { name, email, password, role });
+      const { data } = await api.post('/auth/register', {
+        name,
+        email,
+        password,
+        confirmPassword,
+        role,
+      });
       setUser(data);
       localStorage.setItem('userInfo', JSON.stringify(data));
       localStorage.setItem('token', data.token);
 
       if (data.workspaces?.length > 0) {
-        setActiveWorkspaceState(data.workspaces[0]);
-        localStorage.setItem('activeWorkspace', data.workspaces[0]);
+        const wsId = data.workspaces[0].toString();
+        setActiveWorkspaceState(wsId);
+        localStorage.setItem('activeWorkspace', wsId);
       }
-      
-      return { success: true };
+
+      return { success: true, role: data.role };
     } catch (error) {
       const errorMsg = error.response?.data?.message || (error.message === 'Network Error' ? 'Cannot connect to server. Is the backend running?' : 'Registration failed');
       return { success: false, message: errorMsg };
@@ -87,7 +98,7 @@ export const AuthProvider = ({ children }) => {
       const updatedUser = { ...user, ...data };
       setUser(updatedUser);
       localStorage.setItem('userInfo', JSON.stringify(updatedUser));
-      return { success: true };
+      return { success: true, data: updatedUser };
     } catch (error) {
       return { success: false };
     }

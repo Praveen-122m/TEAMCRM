@@ -1,26 +1,12 @@
 import React, { useContext, useEffect, useState, useRef, useCallback, useMemo } from 'react';
-import { 
-  Box, Typography, Paper, Divider, Avatar, TextField, IconButton, List, 
-  ListItemButton, ListItemIcon, ListItemText, InputBase, Button, 
-  CircularProgress, Tabs, Tab, AvatarGroup, Tooltip, Grid, Card, CardMedia, CardContent, Fade
-} from '@mui/material';
+import { Hash, Search, Send, Paperclip, Plus, Phone, X, Download, FileText, AtSign } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 import { SocketContext } from '../context/SocketContext';
 import { useNavigate, useLocation } from 'react-router-dom';
 import api from '../services/api';
+import toast from 'react-hot-toast';
 import { resolveMediaUrl, isImageFile, isVideoFile, fileDisplayName } from '../utils/mediaUrl';
-import TagIcon from '@mui/icons-material/Tag';
-import SearchIcon from '@mui/icons-material/Search';
-import SendIcon from '@mui/icons-material/Send';
-import AddIcon from '@mui/icons-material/Add';
-import CallIcon from '@mui/icons-material/Call';
 import CreateChannelModal from '../components/modals/CreateChannelModal';
-import AttachFileIcon from '@mui/icons-material/AttachFile';
-import CloseIcon from '@mui/icons-material/Close';
-import AssignmentIcon from '@mui/icons-material/Assignment';
-import DownloadIcon from '@mui/icons-material/Download';
-import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
-import AlternateEmailIcon from '@mui/icons-material/AlternateEmail';
 
 const ChannelChat = ({ isEmbedded = false, workspaceId: workspaceIdProp, workspaceName }) => {
   const { user, activeWorkspace } = useAuth();
@@ -43,7 +29,16 @@ const ChannelChat = ({ isEmbedded = false, workspaceId: workspaceIdProp, workspa
   const [selectedFile, setSelectedFile] = useState(null);
   const [workspaceFiles, setWorkspaceFiles] = useState([]);
 
-  const resolvedWorkspaceId = workspaceIdProp || activeWorkspace || user?.workspaces?.[0];
+  const resolvedWorkspaceId = useMemo(() => {
+    if (location.state?.workspaceId) {
+      return location.state.workspaceId.toString();
+    }
+    if (user?.role === 'Client' && user?.workspaces?.length > 0) {
+      return user.workspaces[0].toString();
+    }
+    const ws = workspaceIdProp || activeWorkspace || user?.workspaces?.[0];
+    return ws?.toString?.() || ws;
+  }, [user?.role, user?.workspaces, workspaceIdProp, activeWorkspace, location.state?.workspaceId]);
 
   // New: Mentions & Real-time States
   const [showMentions, setShowMentions] = useState(false);
@@ -109,6 +104,11 @@ const ChannelChat = ({ isEmbedded = false, workspaceId: workspaceIdProp, workspa
       }
     } catch (err) {
       console.error('Fetch error', err);
+      if (err.response?.status === 403) {
+        toast.error('You do not have access to this workspace. Contact your admin.');
+      } else if (err.response?.data?.message) {
+        toast.error(err.response.data.message);
+      }
     } finally {
       setLoading(false);
     }
@@ -305,36 +305,30 @@ const ChannelChat = ({ isEmbedded = false, workspaceId: workspaceIdProp, workspa
 
     if (isImageFile(msg.fileType, msg.fileUrl)) {
       return (
-        <Box sx={{ mt: 1, borderRadius: 2, overflow: 'hidden', border: '1px solid #f0f0f0', backgroundColor: '#f8f9fa', maxWidth: 360 }}>
-          <img src={url} alt={name} style={{ maxWidth: '100%', display: 'block' }} />
-          <Button size="small" fullWidth startIcon={<DownloadIcon />} component="a" href={url} download={name} target="_blank" rel="noopener noreferrer">
+        <div className="mt-2 rounded-xl overflow-hidden border border-crm-border max-w-sm">
+          <img src={url} alt={name} className="max-w-full block" />
+          <a href={url} download={name} target="_blank" rel="noopener noreferrer" className="block text-center text-xs py-2 text-crm-primary hover:underline">
             Download
-          </Button>
-        </Box>
+          </a>
+        </div>
       );
     }
 
     if (isVideoFile(msg.fileType, msg.fileUrl)) {
       return (
-        <Box sx={{ mt: 1, borderRadius: 2, overflow: 'hidden', border: '1px solid #f0f0f0', backgroundColor: '#f8f9fa', maxWidth: 420 }}>
-          <video src={url} controls style={{ width: '100%', maxHeight: 280, display: 'block' }} />
-          <Button size="small" fullWidth startIcon={<DownloadIcon />} component="a" href={url} download={name} target="_blank" rel="noopener noreferrer">
-            Download Video
-          </Button>
-        </Box>
+        <div className="mt-2 rounded-xl overflow-hidden border border-crm-border max-w-md">
+          <video src={url} controls className="w-full max-h-72 block" />
+          <a href={url} download={name} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-1 text-xs py-2 text-crm-primary hover:underline">
+            <Download size={14} /> Download Video
+          </a>
+        </div>
       );
     }
 
     return (
-      <Box sx={{ mt: 1, p: 1.5, borderRadius: 2, border: '1px solid #e2e8f0', backgroundColor: '#f8f9fa', display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: 2, maxWidth: 360 }}>
-        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, minWidth: 0 }}>
-          <InsertDriveFileIcon sx={{ color: '#5a67d8' }} />
-          <Typography variant="body2" sx={{ fontWeight: 700, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>{name}</Typography>
-        </Box>
-        <Button size="small" variant="contained" startIcon={<DownloadIcon />} component="a" href={url} download={name} target="_blank" rel="noopener noreferrer" sx={{ backgroundColor: '#5a67d8', flexShrink: 0 }}>
-          Download
-        </Button>
-      </Box>
+      <a href={url} download={name} target="_blank" rel="noopener noreferrer" className="mt-2 inline-flex items-center gap-2 text-sm text-crm-primary hover:underline">
+        <Download size={14} /> {name}
+      </a>
     );
   };
 
@@ -342,7 +336,11 @@ const ChannelChat = ({ isEmbedded = false, workspaceId: workspaceIdProp, workspa
     const parts = content.split(/(@\w+(?:\s\w+)?)/g);
     return parts.map((part, i) => {
       if (part.startsWith('@')) {
-        return <Typography key={i} component="span" variant="body2" sx={{ fontWeight: 800, color: '#ffc107', backgroundColor: 'rgba(255, 193, 7, 0.1)', px: 0.5, borderRadius: 1 }}>{part}</Typography>;
+        return (
+          <span key={i} className="font-bold text-amber-400 bg-amber-400/10 px-1 rounded">
+            {part}
+          </span>
+        );
       }
       return part;
     });
@@ -353,276 +351,353 @@ const ChannelChat = ({ isEmbedded = false, workspaceId: workspaceIdProp, workspa
   const renderFilesTab = () => {
     const files = workspaceFiles.length > 0 ? workspaceFiles : channelFiles;
     return (
-      <Box sx={{ p: 3, flexGrow: 1, overflowY: 'auto' }}>
-        <Typography variant="h6" sx={{ fontWeight: 800, mb: 1 }}>Shared Files</Typography>
-        <Typography variant="caption" color="textSecondary" sx={{ display: 'block', mb: 3 }}>
-          Images, videos, and documents shared in {activeChannel ? `#${activeChannel.name}` : 'this workspace'}
-        </Typography>
+      <div className="flex-1 overflow-y-auto p-4 custom-scrollbar">
+        <h3 className="text-lg font-bold text-white mb-1">Shared Files</h3>
+        <p className="text-xs text-crm-textMuted mb-4">
+          Images, videos, and documents in {activeChannel ? `#${activeChannel.name}` : 'this workspace'}
+        </p>
         {files.length === 0 ? (
-          <Box sx={{ textAlign: 'center', py: 10 }}>
-            <InsertDriveFileIcon sx={{ fontSize: 48, color: '#e2e8f0', mb: 2 }} />
-            <Typography color="textSecondary">No files shared yet. Attach files from the Chat tab.</Typography>
-          </Box>
+          <div className="text-center py-16 text-crm-textMuted">
+            <FileText size={48} className="mx-auto mb-3 opacity-30" />
+            <p>No files shared yet. Attach files from the Chat tab.</p>
+          </div>
         ) : (
-          <Grid container spacing={2}>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4">
             {files.map((file) => {
               const url = resolveMediaUrl(file.fileUrl);
               const name = fileDisplayName(file);
               return (
-                <Grid item xs={12} sm={6} md={4} lg={3} key={file._id}>
-                  <Card sx={{ borderRadius: 3, border: '1px solid #f0f0f0', boxShadow: 'none', '&:hover': { boxShadow: '0 4px 12px rgba(0,0,0,0.05)' } }}>
-                    {isImageFile(file.fileType, file.fileUrl) ? (
-                      <CardMedia component="img" height="140" image={url} sx={{ objectFit: 'cover' }} />
-                    ) : isVideoFile(file.fileType, file.fileUrl) ? (
-                      <Box sx={{ height: 140, backgroundColor: '#000' }}>
-                        <video src={url} style={{ width: '100%', height: 140, objectFit: 'cover' }} />
-                      </Box>
-                    ) : (
-                      <Box sx={{ height: 140, backgroundColor: '#f8f9fa', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
-                        <InsertDriveFileIcon sx={{ fontSize: 40, color: '#adb5bd' }} />
-                      </Box>
-                    )}
-                    <CardContent sx={{ p: 1.5, '&:last-child': { pb: 1.5 } }}>
-                      <Typography variant="caption" sx={{ fontWeight: 800, display: 'block', mb: 0.5, overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-                        {name}
-                      </Typography>
-                      <Typography variant="caption" color="textSecondary" sx={{ display: 'block', mb: 0.5 }}>
-                        {file.sender?.name || 'Team member'}
-                      </Typography>
-                      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-                        <Typography variant="caption" color="textSecondary">{new Date(file.createdAt).toLocaleDateString()}</Typography>
-                        <IconButton size="small" component="a" href={url} download={name} target="_blank" rel="noopener noreferrer" sx={{ color: '#5a67d8' }}>
-                          <DownloadIcon fontSize="small" />
-                        </IconButton>
-                      </Box>
-                    </CardContent>
-                  </Card>
-                </Grid>
+                <div key={file._id} className="glass-card overflow-hidden border border-crm-border hover:border-crm-primary/40 transition-colors">
+                  {isImageFile(file.fileType, file.fileUrl) ? (
+                    <img src={url} alt={name} className="w-full h-36 object-cover" />
+                  ) : isVideoFile(file.fileType, file.fileUrl) ? (
+                    <video src={url} className="w-full h-36 object-cover bg-black" />
+                  ) : (
+                    <div className="h-36 flex items-center justify-center bg-crm-darker">
+                      <FileText size={40} className="text-crm-textMuted opacity-50" />
+                    </div>
+                  )}
+                  <div className="p-3">
+                    <p className="text-xs font-bold text-white truncate">{name}</p>
+                    <p className="text-[10px] text-crm-textMuted mt-0.5">{file.sender?.name || 'Team member'}</p>
+                    <div className="flex justify-between items-center mt-2">
+                      <span className="text-[10px] text-crm-textMuted">{new Date(file.createdAt).toLocaleDateString()}</span>
+                      <a href={url} download={name} target="_blank" rel="noopener noreferrer" className="text-crm-primary hover:text-crm-primaryHover">
+                        <Download size={16} />
+                      </a>
+                    </div>
+                  </div>
+                </div>
               );
             })}
-          </Grid>
+          </div>
         )}
-      </Box>
+      </div>
     );
   };
 
-  if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', mt: 10 }}><CircularProgress /></Box>;
+  if (loading) {
+    return (
+      <div className="flex justify-center py-16">
+        <div className="animate-spin h-10 w-10 border-t-2 border-crm-primary rounded-full" />
+      </div>
+    );
+  }
 
-  const filteredMentions = members.filter(u => u.name?.toLowerCase().includes(mentionSearch.toLowerCase()));
+  const filteredMentions = members.filter((u) =>
+    u.name?.toLowerCase().includes(mentionSearch.toLowerCase())
+  );
+
+  const sidebarItems = (tabValue === 1 ? channels : members).filter((i) =>
+    (i.name || '').toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const heightClass = isEmbedded ? 'h-full' : 'h-[calc(100vh-8rem)]';
 
   return (
-    <Box sx={{
-      display: 'flex',
-      height: isEmbedded ? '100%' : 'calc(100vh - 100px)',
-      backgroundColor: isEmbedded ? 'transparent' : '#ffffff',
-      overflow: 'hidden',
-      borderRadius: isEmbedded ? 0 : 4
-    }}>
-      {/* Sidebar — channels */}
-      <Box sx={{ width: 280, borderRight: '1px solid #f0f0f0', display: 'flex', flexDirection: 'column', backgroundColor: isEmbedded ? 'rgba(15,23,42,0.4)' : '#fff' }}>
+    <div className={`flex gap-4 overflow-hidden ${heightClass}`}>
+      {/* Sidebar */}
+      <div className="w-72 flex flex-col glass-panel overflow-hidden shrink-0">
         {workspaceName && (
-          <Box sx={{ px: 2, pt: 2, pb: 1 }}>
-            <Typography variant="caption" sx={{ color: '#94a3b8', fontWeight: 700, textTransform: 'uppercase', letterSpacing: 1 }}>Workspace</Typography>
-            <Typography variant="subtitle2" sx={{ fontWeight: 800, color: isEmbedded ? '#f8fafc' : '#1a202c' }}>{workspaceName}</Typography>
-          </Box>
+          <div className="p-4 border-b border-crm-border">
+            <p className="text-[10px] font-bold uppercase tracking-wider text-crm-textMuted">Workspace</p>
+            <p className="text-sm font-bold text-white truncate mt-0.5">{workspaceName}</p>
+          </div>
         )}
-        <Tabs value={tabValue} onChange={(e, v) => setTabValue(v)} variant="fullWidth" sx={{ borderBottom: '1px solid #f0f0f0', '& .MuiTabs-indicator': { backgroundColor: '#5a67d8', height: 3 } }}>
-          <Tab label="Members" sx={{ textTransform: 'none', fontWeight: 600 }} />
-          <Tab label="Channels" sx={{ textTransform: 'none', fontWeight: 600 }} />
-        </Tabs>
-        <Box sx={{ p: 2 }}>
-          <Box sx={{ display: 'flex', alignItems: 'center', backgroundColor: '#f8f9fa', borderRadius: 2, px: 2, py: 0.5, mb: 1 }}>
-            <SearchIcon sx={{ color: '#adb5bd', fontSize: 18, mr: 1 }} />
-            <InputBase placeholder="Search..." sx={{ flex: 1, fontSize: '0.8rem' }} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} />
-          </Box>
-          {tabValue === 1 && (user.role === 'Admin' || user.role === 'Member') && (
-            <Button size="small" startIcon={<AddIcon />} onClick={() => setIsModalOpen(true)} sx={{ textTransform: 'none', fontWeight: 700, color: '#5a67d8', fontSize: '0.75rem' }}>Add Channel</Button>
-          )}
-        </Box>
-        <List sx={{ flexGrow: 1, overflowY: 'auto', px: 1 }}>
-          {(tabValue === 1 ? channels : members).filter(i => (i.name || '').toLowerCase().includes(searchTerm.toLowerCase())).map((item) => (
-            <ListItemButton
-              key={item._id}
-              onClick={() => {
-                if (tabValue === 1) {
-                  setActiveChannel(item);
-                  clearUnread?.(item._id);
-                } else {
-                  navigate('/messages', { state: { selectedUser: item } });
-                }
-              }}
-              selected={activeChannel?._id === item._id}
-              sx={{ borderRadius: 2, mb: 0.5, '&.Mui-selected': { backgroundColor: '#ebf4ff', color: '#5a67d8' } }}
-            >
-              {tabValue === 1 ? (
-                <>
-                  <ListItemIcon sx={{ minWidth: 32, color: 'inherit' }}><TagIcon fontSize="small" /></ListItemIcon>
-                  <ListItemText primary={item.name} primaryTypographyProps={{ fontWeight: 600, fontSize: '0.85rem' }} />
-                </>
-              ) : (
-                <>
-                  <Avatar src={item.profileImage} sx={{ width: 24, height: 24, mr: 1.5 }} />
-                  <ListItemText primary={item.name} primaryTypographyProps={{ fontWeight: 600, fontSize: '0.85rem' }} />
-                </>
-              )}
-            </ListItemButton>
-          ))}
-        </List>
-      </Box>
 
-      {/* Main Chat Area */}
-      <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', backgroundColor: '#ffffff' }}>
+        <div className="flex border-b border-crm-border">
+          {['Members', 'Channels'].map((label, idx) => (
+            <button
+              key={label}
+              type="button"
+              onClick={() => setTabValue(idx)}
+              className={`flex-1 py-2.5 text-xs font-semibold transition-colors ${
+                tabValue === idx
+                  ? 'text-crm-primary border-b-2 border-crm-primary'
+                  : 'text-crm-textMuted hover:text-white'
+              }`}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+
+        <div className="p-3 border-b border-crm-border">
+          <div className="flex items-center gap-2 bg-crm-darker/50 border border-crm-border rounded-xl px-3 py-2">
+            <Search size={16} className="text-crm-textMuted shrink-0" />
+            <input
+              type="text"
+              placeholder="Search..."
+              value={searchTerm}
+              onChange={(e) => setSearchTerm(e.target.value)}
+              className="flex-1 bg-transparent text-sm text-white placeholder-crm-textMuted focus:outline-none"
+            />
+          </div>
+          {tabValue === 1 && (user.role === 'Admin' || user.role === 'Member') && (
+            <button
+              type="button"
+              onClick={() => setIsModalOpen(true)}
+              className="mt-2 flex items-center gap-1 text-xs font-bold text-crm-primary hover:text-crm-primaryHover"
+            >
+              <Plus size={14} /> Add Channel
+            </button>
+          )}
+        </div>
+
+        <div className="flex-1 overflow-y-auto p-2 custom-scrollbar">
+          {sidebarItems.map((item) => {
+            const isChannel = tabValue === 1;
+            const isSelected = isChannel && activeChannel?._id === item._id;
+            return (
+              <button
+                key={item._id}
+                type="button"
+                onClick={() => {
+                  if (isChannel) {
+                    setActiveChannel(item);
+                    clearUnread?.(item._id);
+                  } else {
+                    navigate('/messages', { state: { selectedUser: item } });
+                  }
+                }}
+                className={`w-full flex items-center gap-2.5 p-3 rounded-xl text-left mb-1 transition-colors ${
+                  isSelected
+                    ? 'bg-crm-primary/20 border border-crm-primary/40 text-white'
+                    : 'hover:bg-crm-border/30 text-crm-text'
+                }`}
+              >
+                {isChannel ? (
+                  <Hash size={16} className={isSelected ? 'text-crm-primary' : 'text-crm-textMuted'} />
+                ) : (
+                  <div className="w-7 h-7 rounded-full bg-crm-primary/20 flex items-center justify-center text-crm-primary text-xs font-bold shrink-0">
+                    {item.name?.charAt(0)}
+                  </div>
+                )}
+                <span className="text-sm font-medium truncate">{item.name}</span>
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      {/* Main chat */}
+      <div className="flex-1 flex flex-col glass-panel overflow-hidden min-w-0">
         {activeChannel ? (
           <>
-            <Box sx={{ borderBottom: '1px solid #f0f0f0' }}>
-              <Box sx={{ p: 1.5, px: 3, display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                  <TagIcon sx={{ color: '#5a67d8' }} />
-                  <Typography variant="h6" sx={{ fontWeight: 800 }}>{activeChannel.name}</Typography>
-                  <Box
-                    sx={{
-                      width: 8,
-                      height: 8,
-                      borderRadius: '50%',
-                      bgcolor: isConnected ? '#48bb78' : '#fc8181',
-                      ml: 0.5,
-                    }}
-                    title={isConnected ? 'Live — connected' : 'Reconnecting…'}
-                  />
-                </Box>
-                <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                  <AvatarGroup max={3}>
-                    {members.slice(0, 3).map(m => <Avatar key={m._id} src={m.profileImage} sx={{ width: 28, height: 28 }} />)}
-                  </AvatarGroup>
-                  <IconButton onClick={() => navigate('/calls')}><CallIcon fontSize="small" /></IconButton>
-                </Box>
-              </Box>
-              
-              <Tabs 
-                value={chatTab} 
-                onChange={(e, v) => setChatTab(v)} 
-                sx={{ 
-                  px: 3, 
-                  minHeight: 40,
-                  '& .MuiTab-root': { textTransform: 'none', fontWeight: 800, fontSize: '0.85rem', minWidth: 80, minHeight: 40, color: '#718096' },
-                  '& .Mui-selected': { color: '#5a67d8' },
-                  '& .MuiTabs-indicator': { backgroundColor: '#5a67d8' }
-                }}
-              >
-                <Tab label="Chat" />
-                <Tab label="Files" />
-              </Tabs>
-            </Box>
+            <div className="border-b border-crm-border">
+              <div className="p-4 flex items-center justify-between gap-3">
+                <div className="flex items-center gap-2 min-w-0">
+                  <Hash size={20} className="text-crm-primary shrink-0" />
+                  <div className="min-w-0">
+                    <h3 className="font-bold text-white truncate">{activeChannel.name}</h3>
+                    <span className={`inline-flex items-center gap-1 text-[10px] ${isConnected ? 'text-emerald-400' : 'text-rose-400'}`}>
+                      <span className={`w-2 h-2 rounded-full ${isConnected ? 'bg-emerald-400' : 'bg-rose-400'}`} />
+                      {isConnected ? 'Live' : 'Connecting...'}
+                    </span>
+                  </div>
+                </div>
+                <div className="flex items-center gap-2 shrink-0">
+                  <div className="flex -space-x-2">
+                    {members.slice(0, 3).map((m) => (
+                      <div
+                        key={m._id}
+                        className="w-8 h-8 rounded-full bg-gradient-to-br from-crm-primary to-crm-accent border-2 border-crm-card flex items-center justify-center text-[10px] font-bold text-white"
+                        title={m.name}
+                      >
+                        {m.name?.charAt(0)}
+                      </div>
+                    ))}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => navigate('/calls')}
+                    className="p-2 rounded-xl hover:bg-crm-border/30 text-crm-textMuted hover:text-white"
+                  >
+                    <Phone size={18} />
+                  </button>
+                </div>
+              </div>
+
+              <div className="flex px-4 border-t border-crm-border/50">
+                {['Chat', 'Files'].map((label, idx) => (
+                  <button
+                    key={label}
+                    type="button"
+                    onClick={() => setChatTab(idx)}
+                    className={`px-4 py-2.5 text-xs font-bold transition-colors ${
+                      chatTab === idx
+                        ? 'text-crm-primary border-b-2 border-crm-primary'
+                        : 'text-crm-textMuted hover:text-white'
+                    }`}
+                  >
+                    {label}
+                  </button>
+                ))}
+              </div>
+            </div>
 
             {chatTab === 0 ? (
               <>
-                {/* Messages */}
-                <Box sx={{ flexGrow: 1, p: 3, overflowY: 'auto', display: 'flex', flexDirection: 'column', gap: 3 }}>
-                  {messages.map((msg) => (
-                    <Box key={msg._id} sx={{ display: 'flex', gap: 2 }}>
-                      <Avatar src={msg.sender?.profileImage} sx={{ width: 40, height: 40, borderRadius: 1.5 }} />
-                      <Box sx={{ maxWidth: '80%' }}>
-                        <Box sx={{ display: 'flex', alignItems: 'center', gap: 1, mb: 0.2 }}>
-                          <Typography variant="subtitle2" sx={{ fontWeight: 800, fontSize: '0.85rem' }}>{msg.sender?.name}</Typography>
-                          <Typography variant="caption" sx={{ color: '#adb5bd' }}>{new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</Typography>
-                        </Box>
-                        {msg.fileUrl ? (
-                          renderFileAttachment(msg)
-                        ) : (
-                          <Typography variant="body2" sx={{ color: '#495057' }}>
-                            {renderMessageContent(msg.content)}
-                          </Typography>
-                        )}
-                      </Box>
-                    </Box>
-                  ))}
-                  <div ref={messagesEndRef} />
-                </Box>
-
-                {/* Input Area */}
-                <Box sx={{ p: 2, px: 3, position: 'relative' }}>
-                  {/* Typing Indicator above input */}
+                <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
+                  {messages.map((msg) => {
+                    const isOwn = (msg.sender?._id || msg.senderId) === user._id;
+                    return (
+                      <div key={msg._id} className={`flex ${isOwn ? 'justify-end' : 'justify-start'}`}>
+                        <div
+                          className={`max-w-[78%] rounded-2xl px-4 py-2.5 ${
+                            isOwn
+                              ? 'bg-crm-primary text-white'
+                              : 'bg-crm-darker border border-crm-border text-crm-text'
+                          }`}
+                        >
+                          {!isOwn && (
+                            <p className="text-[10px] font-semibold text-crm-textMuted mb-1">{msg.sender?.name}</p>
+                          )}
+                          {msg.fileUrl ? (
+                            renderFileAttachment(msg)
+                          ) : (
+                            <p className="text-sm whitespace-pre-wrap">{renderMessageContent(msg.content)}</p>
+                          )}
+                          <p className="text-[10px] opacity-60 mt-1 text-right">
+                            {new Date(msg.createdAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
                   {isTypingRemote && (
-                    <Box sx={{ position: 'absolute', bottom: '100%', left: 24, mb: 1 }}>
-                      <Typography variant="caption" sx={{ fontWeight: 800, color: '#48bb78', animation: 'pulse 1.5s infinite' }}>Someone is typing...</Typography>
-                    </Box>
+                    <p className="text-xs text-emerald-400 animate-pulse">Someone is typing...</p>
                   )}
+                  <div ref={messagesEndRef} />
+                </div>
 
-                  <Fade in={showMentions}>
-                    <Paper sx={{ 
-                      position: 'absolute', bottom: '100%', left: 24, mb: 1, 
-                      borderRadius: 4, boxShadow: '0 8px 30px rgba(0,0,0,0.12)', 
-                      minWidth: 260, maxHeight: 300, overflowY: 'auto', 
-                      zIndex: 1000, border: '1px solid #e2e8f0' 
-                    }}>
-                      <Box sx={{ p: 1.5, bgcolor: '#f8fafc', borderBottom: '1px solid #f1f5f9', display: 'flex', alignItems: 'center', gap: 1 }}>
-                        <AlternateEmailIcon sx={{ fontSize: 16, color: '#5a67d8' }} />
-                        <Typography variant="caption" sx={{ fontWeight: 900, color: '#64748b' }}>MENTION MEMBER</Typography>
-                      </Box>
-                      <List sx={{ p: 1 }}>
-                        {filteredMentions.length > 0 ? filteredMentions.map(m => (
-                          <ListItemButton key={m._id} onClick={() => handleMentionSelect(m)} sx={{ borderRadius: 2, gap: 1.5, py: 1 }}>
-                            <Avatar src={m.profileImage} sx={{ width: 32, height: 32, borderRadius: 1.5 }} />
-                            <ListItemText primary={m.name} primaryTypographyProps={{ fontWeight: 800, fontSize: '0.85rem' }} />
-                          </ListItemButton>
-                        )) : (
-                          <Typography sx={{ p: 2, color: '#94a3b8', fontSize: '0.8rem', textAlign: 'center' }}>No users found</Typography>
-                        )}
-                      </List>
-                    </Paper>
-                  </Fade>
+                <div className="p-4 border-t border-crm-border relative">
+                  {showMentions && (
+                    <div className="absolute bottom-full left-4 right-4 mb-2 glass-panel border border-crm-border rounded-xl overflow-hidden z-20 max-h-64 overflow-y-auto custom-scrollbar">
+                      <div className="px-3 py-2 border-b border-crm-border flex items-center gap-2 bg-crm-darker/50">
+                        <AtSign size={14} className="text-crm-primary" />
+                        <span className="text-[10px] font-bold text-crm-textMuted uppercase">Mention member</span>
+                      </div>
+                      {filteredMentions.length > 0 ? (
+                        filteredMentions.map((m) => (
+                          <button
+                            key={m._id}
+                            type="button"
+                            onClick={() => handleMentionSelect(m)}
+                            className="w-full flex items-center gap-2 px-3 py-2 hover:bg-crm-primary/10 text-left"
+                          >
+                            <div className="w-8 h-8 rounded-lg bg-crm-primary/20 flex items-center justify-center text-crm-primary text-sm font-bold">
+                              {m.name?.charAt(0)}
+                            </div>
+                            <span className="text-sm font-medium text-white">{m.name}</span>
+                          </button>
+                        ))
+                      ) : (
+                        <p className="p-3 text-xs text-crm-textMuted text-center">No users found</p>
+                      )}
+                    </div>
+                  )}
 
                   {selectedFile && (
-                    <Box sx={{ p: 1.5, backgroundColor: '#f8f9fa', borderRadius: 2, mb: 1, display: 'flex', alignItems: 'center', gap: 2 }}>
+                    <div className="mb-2 px-3 py-2 rounded-xl bg-crm-darker border border-crm-border flex items-center gap-2 text-sm text-white">
                       {selectedFile.preview && !selectedFile.isVideo ? (
-                        <img src={selectedFile.preview} alt="" style={{ width: 40, height: 40, borderRadius: 4, objectFit: 'cover' }} />
+                        <img src={selectedFile.preview} alt="" className="w-10 h-10 rounded object-cover" />
                       ) : selectedFile.preview && selectedFile.isVideo ? (
-                        <video src={selectedFile.preview} style={{ width: 56, height: 40, borderRadius: 4 }} />
+                        <video src={selectedFile.preview} className="w-14 h-10 rounded" />
                       ) : (
-                        <AttachFileIcon />
+                        <Paperclip size={18} className="text-crm-textMuted" />
                       )}
-                      <Typography variant="caption" sx={{ flexGrow: 1, fontWeight: 700 }}>{selectedFile.file.name}</Typography>
-                      <IconButton size="small" onClick={() => setSelectedFile(null)}><CloseIcon fontSize="small" /></IconButton>
-                    </Box>
+                      <span className="flex-1 truncate text-xs font-medium">{selectedFile.file.name}</span>
+                      <button type="button" onClick={() => setSelectedFile(null)} className="text-crm-textMuted hover:text-white">
+                        <X size={16} />
+                      </button>
+                    </div>
                   )}
-                  <Box component="form" onSubmit={handleSendMessage} sx={{ display: 'flex', alignItems: 'center', backgroundColor: '#f8f9fa', borderRadius: 10, px: 2, py: 0.5, border: '1px solid #e2e8f0' }}>
-                    <input type="file" hidden ref={fileInputRef} onChange={handleFileSelect} accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.txt" />
-                    <IconButton size="small" onClick={() => fileInputRef.current.click()} disabled={uploading}><AttachFileIcon fontSize="small" /></IconButton>
-                    <InputBase 
-                      inputRef={inputRef}
-                      fullWidth 
-                      placeholder={`Message #${activeChannel.name}`} 
-                      value={messageInput} 
-                      onChange={handleInputChange} 
+
+                  <form onSubmit={handleSendMessage} className="flex gap-2">
+                    <input
+                      type="file"
+                      hidden
+                      ref={fileInputRef}
+                      onChange={handleFileSelect}
+                      accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.zip,.txt"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => fileInputRef.current?.click()}
+                      disabled={uploading}
+                      className="p-2.5 rounded-xl hover:bg-crm-border/30 text-crm-textMuted shrink-0"
+                    >
+                      <Paperclip size={20} />
+                    </button>
+                    <input
+                      ref={inputRef}
+                      value={messageInput}
+                      onChange={handleInputChange}
                       onKeyDown={(e) => {
                         if (e.key === 'Enter' && !e.shiftKey) {
                           e.preventDefault();
                           handleSendMessage();
                         }
                       }}
-                      sx={{ fontSize: '0.9rem', ml: 1 }} 
+                      placeholder={`Message #${activeChannel.name}`}
+                      className="flex-1 bg-crm-darker/50 border border-crm-border rounded-xl px-4 py-2.5 text-sm text-white placeholder-crm-textMuted focus:border-crm-primary focus:outline-none"
+                      disabled={uploading}
                     />
-                    <IconButton type="submit" sx={{ color: '#5a67d8' }} disabled={uploading}>{uploading ? <CircularProgress size={20} /> : <SendIcon fontSize="small" />}</IconButton>
-                  </Box>
-                </Box>
+                    <button
+                      type="submit"
+                      disabled={uploading || (!messageInput.trim() && !selectedFile)}
+                      className="glass-button p-2.5 shrink-0 disabled:opacity-50"
+                    >
+                      {uploading ? (
+                        <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                      ) : (
+                        <Send size={20} />
+                      )}
+                    </button>
+                  </form>
+                </div>
               </>
-            ) : renderFilesTab()}
+            ) : (
+              renderFilesTab()
+            )}
           </>
         ) : (
-          <Box sx={{ display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', height: '100%', gap: 2, p: 3 }}>
-            <Typography color="textSecondary" textAlign="center">
+          <div className="flex-1 flex flex-col items-center justify-center text-crm-textMuted gap-3 p-6">
+            <Hash size={48} className="opacity-30" />
+            <p className="text-center text-sm">
               {channels.length === 0
                 ? 'No channels yet. Create #general or add a new channel.'
                 : 'Select a channel to begin chatting'}
-            </Typography>
+            </p>
             {(user.role === 'Admin' || user.role === 'Member') && (
-              <Button variant="contained" startIcon={<AddIcon />} onClick={() => setIsModalOpen(true)} sx={{ backgroundColor: '#5a67d8' }}>
-                Create Channel
-              </Button>
+              <button type="button" onClick={() => setIsModalOpen(true)} className="glass-button text-sm">
+                <Plus size={16} /> Create Channel
+              </button>
             )}
-          </Box>
+          </div>
         )}
-      </Box>
+      </div>
 
       <CreateChannelModal
         open={isModalOpen}
@@ -633,10 +708,7 @@ const ChannelChat = ({ isEmbedded = false, workspaceId: workspaceIdProp, workspa
           if (newChannel) setActiveChannel(newChannel);
         }}
       />
-      <style>{`
-        @keyframes pulse { 0% { opacity: 0.4; } 50% { opacity: 1; } 100% { opacity: 0.4; } }
-      `}</style>
-    </Box>
+    </div>
   );
 };
 

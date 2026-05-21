@@ -3,6 +3,10 @@ const User = require('../models/User');
 const Channel = require('../models/Channel');
 const Client = require('../models/Client');
 const { validateEmail, validatePasswordStrength } = require('../utils/validation');
+const {
+  ensureGeneralChannel,
+  syncPublicChannelsForUser,
+} = require('./channelController');
 
 // @desc    Create a workspace
 // @route   POST /api/workspaces
@@ -112,29 +116,37 @@ const getWorkspaces = async (req, res) => {
 // @access  Private
 const joinWorkspace = async (req, res) => {
   try {
-    const { inviteCode } = req.body;
-    
-    const workspace = await Workspace.findOne({ where: { inviteCode } });
+    const code = (req.body.inviteCode || '').trim().toUpperCase();
+    if (!code) {
+      return res.status(400).json({ message: 'Invite code is required' });
+    }
+
+    const workspace = await Workspace.findOne({ where: { inviteCode: code } });
     if (!workspace) {
       return res.status(404).json({ message: 'Invalid invite code' });
     }
 
     const isAlreadyMember = await workspace.hasMember(req.user._id);
-    if (isAlreadyMember) {
-      return res.status(400).json({ message: 'Already a member of this workspace' });
+    if (!isAlreadyMember) {
+      await workspace.addMember(req.user._id);
     }
 
-    await workspace.addMember(req.user._id);
+    await ensureGeneralChannel(workspace._id);
+    await syncPublicChannelsForUser(workspace._id, req.user._id);
 
-    // Also auto-add user to the general channel of this workspace
-    const channel = await Channel.findOne({
-      where: { workspaceId: workspace._id, name: 'general' }
+    const fresh = await Workspace.findByPk(workspace._id, {
+      include: [
+        { model: User, as: 'owner', attributes: ['_id', 'name', 'email'] },
+      ],
     });
-    if (channel) {
-      await channel.addMember(req.user._id);
-    }
 
-    res.json(workspace);
+    res.json({
+      ...fresh.toJSON(),
+      alreadyMember: isAlreadyMember,
+      message: isAlreadyMember
+        ? 'You are already in this workspace'
+        : 'Joined workspace successfully',
+    });
   } catch (error) {
     console.error('[JOIN_WORKSPACE_ERR]', error);
     res.status(500).json({ message: `Server Error: ${error.message}` });

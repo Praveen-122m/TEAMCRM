@@ -1,120 +1,215 @@
 import { useState } from 'react';
 import { useNavigate, Link } from 'react-router-dom';
-import { User as UserIcon, Mail, Lock } from 'lucide-react';
+import { Shield, ArrowRight } from 'lucide-react';
 import { useAuth } from '../hooks/useAuth';
 
+const ROLES = [
+  { id: 'Member', label: 'Member' },
+  { id: 'Admin', label: 'Admin' },
+];
+
 const Register = () => {
+  const [activeRole, setActiveRole] = useState('Member');
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
-  
-  const navigate = useNavigate();
-  const { register } = useAuth();
-  
+  const [confirmPassword, setConfirmPassword] = useState('');
+  const [agreeTerms, setAgreeTerms] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
+  const navigate = useNavigate();
+  const { register } = useAuth();
+
+  const redirectByRole = (role) => {
+    if (role === 'Admin') navigate('/admin');
+    else if (role === 'Member') navigate('/member');
+    else navigate('/');
+  };
+
   const handleSubmit = async (e) => {
     e.preventDefault();
-    setLoading(true);
     setError('');
 
-    const res = await register(name, email, password, 'Admin');
+    if (!name.trim()) {
+      setError('Please enter your full name');
+      return;
+    }
+    if (!email.trim()) {
+      setError('Please enter your email address');
+      return;
+    }
+    if (password !== confirmPassword) {
+      setError('Passwords do not match');
+      return;
+    }
+    if (!agreeTerms) {
+      setError('Please agree to the Terms of Service and Privacy Policy');
+      return;
+    }
+
+    setLoading(true);
+
+    const res = await register(
+      name.trim(),
+      email.trim(),
+      password,
+      activeRole,
+      confirmPassword
+    );
 
     if (res.success) {
-      navigate('/admin');
+      redirectByRole(res.role);
     } else {
-      setError(res.message);
+      setError(res.message || 'Registration failed');
       setLoading(false);
     }
   };
 
   return (
-    <div className="min-h-screen bg-crm-dark flex items-center justify-center p-4 relative overflow-hidden">
-      {/* Background decorations */}
-      <div className="absolute top-1/4 right-1/4 w-96 h-96 bg-crm-primary/20 rounded-full blur-[100px]"></div>
-      <div className="absolute bottom-1/4 left-1/4 w-96 h-96 bg-crm-accent/20 rounded-full blur-[100px]"></div>
+    <div className="register-page flex flex-col items-center justify-center px-4 py-10 relative overflow-hidden">
+      <div className="register-hero-glow absolute inset-0 pointer-events-none" aria-hidden />
 
-      <div className="w-full max-w-md z-10">
-        <div className="glass-panel p-8">
-          <div className="text-center mb-8">
-            <div className="w-16 h-16 mx-auto bg-gradient-to-bl from-crm-primary to-crm-accent rounded-2xl flex items-center justify-center shadow-glow mb-4">
-              <span className="text-white text-3xl font-bold">C</span>
+      <div className="relative z-10 text-center mb-8 max-w-lg">
+        <div className="w-12 h-12 mx-auto mb-4 rounded-xl bg-[#3b82f6]/20 flex items-center justify-center border border-[#3b82f6]/30">
+          <Shield className="text-[#60a5fa]" size={26} strokeWidth={2} />
+        </div>
+        <h1 className="text-2xl sm:text-3xl font-bold text-white tracking-tight">AgencyOS</h1>
+        <p className="mt-2 text-sm text-slate-400">Join the management ecosystem</p>
+      </div>
+
+      <div className="register-card w-full max-w-[560px] relative z-10 p-7 sm:p-9">
+        <div className="login-role-tabs mb-7">
+          {ROLES.map((role) => (
+            <button
+              key={role.id}
+              type="button"
+              onClick={() => {
+                setActiveRole(role.id);
+                setError('');
+              }}
+              className={`login-role-tab flex-1 py-2.5 text-sm font-semibold rounded-full transition-all duration-200 ${
+                activeRole === role.id
+                  ? 'login-role-tab-active text-[#3b82f6]'
+                  : 'text-slate-400 hover:text-slate-600'
+              }`}
+            >
+              {role.label}
+            </button>
+          ))}
+        </div>
+
+        {error && (
+          <div className="mb-5 px-4 py-3 rounded-xl bg-rose-50 border border-rose-200 text-rose-600 text-sm">
+            {error}
+          </div>
+        )}
+
+        <form onSubmit={handleSubmit}>
+          <div className="register-grid">
+            <div>
+              <label className="register-label-upper" htmlFor="reg-name">
+                Full Name
+              </label>
+              <input
+                id="reg-name"
+                type="text"
+                required
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                className="register-input-plain"
+                placeholder="John Doe"
+                autoComplete="name"
+              />
             </div>
-            <h2 className="text-3xl font-bold text-white mb-2 tracking-tight">Create Workspace</h2>
-            <p className="text-crm-textMuted">Start managing your agency</p>
+            <div>
+              <label className="register-label-upper" htmlFor="reg-email">
+                Email
+              </label>
+              <input
+                id="reg-email"
+                type="email"
+                required
+                value={email}
+                onChange={(e) => setEmail(e.target.value)}
+                className="register-input-plain"
+                placeholder="john@example.com"
+                autoComplete="email"
+              />
+            </div>
+            <div>
+              <label className="register-label-upper" htmlFor="reg-password">
+                Password
+              </label>
+              <input
+                id="reg-password"
+                type="password"
+                required
+                value={password}
+                onChange={(e) => setPassword(e.target.value)}
+                className="register-input-plain"
+                placeholder="••••••••"
+                autoComplete="new-password"
+              />
+            </div>
+            <div>
+              <label className="register-label-upper" htmlFor="reg-confirm">
+                Confirm Password
+              </label>
+              <input
+                id="reg-confirm"
+                type="password"
+                required
+                value={confirmPassword}
+                onChange={(e) => setConfirmPassword(e.target.value)}
+                className="register-input-plain"
+                placeholder="••••••••"
+                autoComplete="new-password"
+              />
+            </div>
           </div>
 
-          {error && (
-            <div className="mb-6 p-4 rounded-xl bg-rose-500/10 border border-rose-500/20 text-rose-400 text-sm">
-              {error}
-            </div>
-          )}
-
-          <form onSubmit={handleSubmit} className="space-y-5">
-            <div>
-              <label className="block text-sm font-medium text-crm-textMuted mb-2">Full Name</label>
-              <div className="relative">
-                <UserIcon className="absolute left-3 top-1/2 -translate-y-1/2 text-crm-textMuted" size={20} />
-                <input
-                  type="text"
-                  required
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  className="glass-input w-full pl-10"
-                  placeholder="John Doe"
-                />
-              </div>
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium text-crm-textMuted mb-2">Email Address</label>
-              <div className="relative">
-                <Mail className="absolute left-3 top-1/2 -translate-y-1/2 text-crm-textMuted" size={20} />
-                <input
-                  type="email"
-                  required
-                  value={email}
-                  onChange={(e) => setEmail(e.target.value)}
-                  className="glass-input w-full pl-10"
-                  placeholder="you@agency.com"
-                />
-              </div>
-            </div>
-
-            <div>
-              <label className="block text-sm font-medium text-crm-textMuted mb-2">Password</label>
-              <div className="relative">
-                <Lock className="absolute left-3 top-1/2 -translate-y-1/2 text-crm-textMuted" size={20} />
-                <input
-                  type="password"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                  className="glass-input w-full pl-10"
-                  placeholder="••••••••"
-                />
-              </div>
-              <p className="text-xs text-crm-textMuted mt-2">Must be at least 8 characters long</p>
-            </div>
-
-            <button
-              type="submit"
-              disabled={loading}
-              className="w-full glass-button h-12 text-lg disabled:opacity-50 mt-4"
-            >
-              {loading ? 'Creating...' : 'Create Account'}
-            </button>
-          </form>
-
-          <p className="mt-8 text-center text-sm text-crm-textMuted">
-            Already have an account?{' '}
-            <Link to="/login" className="text-crm-primary hover:text-crm-primaryHover font-medium transition-colors">
-              Sign in
-            </Link>
+          <p className="mt-3 text-[10px] text-slate-400 leading-relaxed">
+            Use 8+ characters with uppercase, lowercase, a number, and a special character.
           </p>
-        </div>
+
+          <label className="mt-5 flex items-start gap-2.5 cursor-pointer select-none">
+            <input
+              type="checkbox"
+              className="register-checkbox mt-0.5"
+              checked={agreeTerms}
+              onChange={(e) => setAgreeTerms(e.target.checked)}
+            />
+            <span className="text-xs text-slate-500 leading-relaxed">
+              I agree to the{' '}
+              <span className="text-[#3b82f6] font-semibold">Terms of Service</span> and{' '}
+              <span className="text-[#3b82f6] font-semibold">Privacy Policy</span>.
+            </span>
+          </label>
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="login-submit w-full mt-6 disabled:opacity-60"
+          >
+            {loading ? (
+              <span className="text-slate-400">Creating account...</span>
+            ) : (
+              <>
+                <span className="text-[#3b82f6] font-bold">Register</span>
+                <ArrowRight size={18} className="text-[#3b82f6]" strokeWidth={2.5} />
+              </>
+            )}
+          </button>
+        </form>
       </div>
+
+      <p className="relative z-10 mt-8 text-center text-sm text-slate-400">
+        Already have an account?{' '}
+        <Link to="/login" className="text-[#3b82f6] font-bold hover:underline">
+          Sign In
+        </Link>
+      </p>
     </div>
   );
 };
