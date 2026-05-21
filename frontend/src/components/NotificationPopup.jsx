@@ -1,4 +1,4 @@
-import React, { useContext, useEffect, useState } from 'react';
+import React, { useContext, useEffect, useState, useRef } from 'react';
 import { Snackbar, Box, Typography, Avatar, IconButton, Paper, Slide } from '@mui/material';
 import { SocketContext } from '../context/SocketContext';
 import { AuthContext } from '../context/AuthContext';
@@ -17,6 +17,12 @@ const NotificationPopup = () => {
   const [notification, setNotification] = useState(null);
   const navigate = useNavigate();
   const location = useLocation();
+  const locationRef = useRef(location.pathname);
+
+  // Keep ref in sync with current path
+  useEffect(() => {
+    locationRef.current = location.pathname;
+  }, [location.pathname]);
 
   useEffect(() => {
     if (!socket) return;
@@ -24,16 +30,18 @@ const NotificationPopup = () => {
     const messageListener = (newMessage) => {
       // Don't show notification if user is already on the relevant chat page
       const senderId = newMessage.senderId || newMessage.sender?._id || newMessage.sender;
-      const isMe = senderId.toString() === user?._id?.toString();
+      const isMe = senderId?.toString() === user?._id?.toString();
       if (isMe) return;
 
       const isDirectMessage = newMessage.isDirectMessage;
-      const currentPath = location.pathname;
+      const currentPath = locationRef.current;
       
       // Determine if we should skip notification
       let skip = false;
       if (isDirectMessage && currentPath === '/dms') {
          skip = true; 
+      } else if (!isDirectMessage && currentPath === '/channels') {
+         skip = true;
       }
 
       if (!skip) {
@@ -50,7 +58,7 @@ const NotificationPopup = () => {
       const isMe = senderId?.toString() === user?._id?.toString();
       if (isMe) return;
 
-      if (location.pathname === '/announcements') return;
+      if (locationRef.current === '/announcements') return;
 
       setNotification({
         isAnnouncement: true,
@@ -70,7 +78,7 @@ const NotificationPopup = () => {
       socket.off('message_received', messageListener);
       socket.off('announcement_received', announcementListener);
     };
-  }, [socket, user, location.pathname]);
+  }, [socket, user]);
 
   const handleClose = () => setOpen(false);
 

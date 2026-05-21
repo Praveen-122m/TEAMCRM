@@ -32,12 +32,23 @@ const connectDB = async () => {
     await sequelize.sync();
     console.log('[DB] SQL Database tables synchronized successfully.');
 
+    // Sync Workspace table to ensure 'type' field is created
+    try {
+      const Workspace = require('../models/Workspace');
+      await Workspace.sync({ alter: true });
+      console.log('[DB] Workspace table altered/synced successfully.');
+    } catch (e) {
+      console.error('[DB] Workspace sync failed:', e.message);
+    }
+
     // Targeted sync for meta ads models
     try {
       const MetaAdsCampaign = require('../models/MetaAdsCampaign');
       const MetaAdsConnection = require('../models/MetaAdsConnection');
+      const MetaAdsLead = require('../models/MetaAdsLead');
       await MetaAdsCampaign.sync({ alter: true });
       await MetaAdsConnection.sync({ alter: true });
+      await MetaAdsLead.sync({ alter: true });
     } catch (e) {
       console.log('Meta ads sync skipped', e.message);
     }

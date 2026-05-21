@@ -1,21 +1,39 @@
-import React from 'react';
-import ReactDOM from 'react-dom/client';
-import { ThemeProvider, CssBaseline } from '@mui/material';
+import { StrictMode } from 'react';
+import { createRoot } from 'react-dom/client';
+import { BrowserRouter } from 'react-router-dom';
+import { Toaster } from 'react-hot-toast';
 import App from './App.jsx';
-import theme from './theme/theme.js';
-import { AuthProvider } from './context/AuthContext';
-import { SocketProvider } from './context/SocketContext';
+import { AuthProvider } from './context/AuthContext.jsx';
 import './index.css';
 
-ReactDOM.createRoot(document.getElementById('root')).render(
-  <React.StrictMode>
-    <ThemeProvider theme={theme}>
-      <CssBaseline />
+createRoot(document.getElementById('root')).render(
+  <StrictMode>
+    <BrowserRouter>
       <AuthProvider>
-        <SocketProvider>
-          <App />
-        </SocketProvider>
+        <App />
+        <Toaster 
+          position="top-right"
+          toastOptions={{
+            style: {
+              background: '#1e293b',
+              color: '#f8fafc',
+              border: '1px solid #334155',
+            },
+            success: {
+              iconTheme: {
+                primary: '#10b981',
+                secondary: '#1e293b',
+              },
+            },
+            error: {
+              iconTheme: {
+                primary: '#ef4444',
+                secondary: '#1e293b',
+              },
+            },
+          }}
+        />
       </AuthProvider>
-    </ThemeProvider>
-  </React.StrictMode>
+    </BrowserRouter>
+  </StrictMode>,
 );

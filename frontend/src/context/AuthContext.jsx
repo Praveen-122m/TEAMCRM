@@ -1,5 +1,5 @@
-import React, { createContext, useState, useEffect } from 'react';
-import axios from 'axios';
+import { createContext, useState, useEffect } from 'react';
+import api from '../services/api';
 
 export const AuthContext = createContext();
 
@@ -8,30 +8,24 @@ export const AuthProvider = ({ children }) => {
   const [activeWorkspace, setActiveWorkspaceState] = useState(localStorage.getItem('activeWorkspace'));
   const [loading, setLoading] = useState(true);
 
-  // Configure axios base URL
-  axios.defaults.baseURL = import.meta.env.VITE_API_URL || 'http://localhost:5005';
-
   useEffect(() => {
     const userInfo = localStorage.getItem('userInfo');
-    if (userInfo) {
+    const token = localStorage.getItem('token');
+    
+    if (userInfo && token) {
       const parsedUser = JSON.parse(userInfo);
       setUser(parsedUser);
-      axios.defaults.headers.common['Authorization'] = `Bearer ${parsedUser.token}`;
       
       // Handle active workspace logic securely
       if (parsedUser.workspaces?.length > 0) {
-        // If there's an activeWorkspace in cache, verify it still exists for this user
         if (activeWorkspace && !parsedUser.workspaces.includes(activeWorkspace)) {
           setActiveWorkspaceState(parsedUser.workspaces[0]);
           localStorage.setItem('activeWorkspace', parsedUser.workspaces[0]);
-        } 
-        // If no active workspace is set, set the first one
-        else if (!activeWorkspace) {
+        } else if (!activeWorkspace) {
           setActiveWorkspaceState(parsedUser.workspaces[0]);
           localStorage.setItem('activeWorkspace', parsedUser.workspaces[0]);
         }
       } else {
-        // If user has no workspaces, clear the cache
         setActiveWorkspaceState(null);
         localStorage.removeItem('activeWorkspace');
       }
@@ -48,32 +42,45 @@ export const AuthProvider = ({ children }) => {
   const login = async (email, password, secretCode = null) => {
     try {
       const payload = secretCode ? { secretCode, password } : { email, password };
-      const { data } = await axios.post('/api/auth/login', payload);
+      const { data } = await api.post('/auth/login', payload);
       setUser(data);
       localStorage.setItem('userInfo', JSON.stringify(data));
-      axios.defaults.headers.common['Authorization'] = `Bearer ${data.token}`;
+      localStorage.setItem('token', data.token);
+
+      if (data.workspaces?.length > 0) {
+        setActiveWorkspaceState(data.workspaces[0]);
+        localStorage.setItem('activeWorkspace', data.workspaces[0]);
+      }
+      
       return { success: true };
     } catch (error) {
-      return { success: false, message: error.response?.data?.message || 'Login failed' };
+      const errorMsg = error.response?.data?.message || (error.message === 'Network Error' ? 'Cannot connect to server. Is the backend running?' : 'Login failed');
+      return { success: false, message: errorMsg };
     }
   };
 
   const register = async (name, email, password, role = 'Member') => {
     try {
-      const { data } = await axios.post('/api/auth/register', { name, email, password, role });
+      const { data } = await api.post('/auth/register', { name, email, password, role });
       setUser(data);
       localStorage.setItem('userInfo', JSON.stringify(data));
-      axios.defaults.headers.common['Authorization'] = `Bearer ${data.token}`;
+      localStorage.setItem('token', data.token);
+
+      if (data.workspaces?.length > 0) {
+        setActiveWorkspaceState(data.workspaces[0]);
+        localStorage.setItem('activeWorkspace', data.workspaces[0]);
+      }
+      
       return { success: true };
     } catch (error) {
-      return { success: false, message: error.response?.data?.message || 'Registration failed' };
+      const errorMsg = error.response?.data?.message || (error.message === 'Network Error' ? 'Cannot connect to server. Is the backend running?' : 'Registration failed');
+      return { success: false, message: errorMsg };
     }
   };
 
   const refreshUser = async () => {
     try {
-      const { data } = await axios.get('/api/auth/profile');
-      // Merge new data with existing token
+      const { data } = await api.get('/auth/profile');
       const updatedUser = { ...user, ...data };
       setUser(updatedUser);
       localStorage.setItem('userInfo', JSON.stringify(updatedUser));
@@ -83,10 +90,16 @@ export const AuthProvider = ({ children }) => {
     }
   };
 
-  const logout = () => {
+  const logout = async () => {
+    try {
+      await api.post('/auth/logout');
+    } catch (error) {
+      console.error('Logout error', error);
+    }
     setUser(null);
     localStorage.removeItem('userInfo');
-    delete axios.defaults.headers.common['Authorization'];
+    localStorage.removeItem('token');
+    localStorage.removeItem('activeWorkspace');
   };
 
   return (

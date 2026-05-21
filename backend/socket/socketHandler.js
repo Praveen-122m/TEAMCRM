@@ -62,6 +62,10 @@ const socketHandler = (io) => {
       } else if (receiverId) {
         // Direct Message
         io.to(receiverId.toString()).emit('message_received', newMessageReceived);
+        const senderId = newMessageReceived.senderId || newMessageReceived.sender?._id || newMessageReceived.sender;
+        if (senderId) {
+          io.to(senderId.toString()).emit('message_received', newMessageReceived);
+        }
       }
     });
 

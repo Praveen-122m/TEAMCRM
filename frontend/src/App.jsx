@@ -1,61 +1,95 @@
-import React, { useContext } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { AuthContext } from './context/AuthContext';
+import { Routes, Route, Navigate } from 'react-router-dom';
+import { Layout } from './components/Layout';
+
+// Auth Pages
 import Login from './pages/Login';
 import Register from './pages/Register';
-import ForgotPassword from './pages/ForgotPassword';
+
+// Admin Pages
 import Dashboard from './pages/Dashboard';
-import ChannelChat from './pages/ChannelChat';
-import DirectMessages from './pages/DirectMessages';
-import VideoCall from './pages/VideoCall';
-import VideoRooms from './pages/VideoRooms';
-import FileManager from './pages/FileManager';
-import AdminPanel from './pages/AdminPanel';
+import ClientsPage from './pages/admin/ClientsPage';
+import MembersPage from './pages/admin/MembersPage';
+import ReportsPage from './pages/admin/ReportsPage';
+import OfficeWorkspaces from './pages/admin/OfficeWorkspaces';
+import ClientWorkspaces from './pages/admin/ClientWorkspaces';
+import WorkspaceDetails from './pages/admin/WorkspaceDetails';
+
+// Member Pages
+import MemberDashboard from './pages/member/MemberDashboard';
+
+// Client Pages
 import ClientDashboard from './pages/ClientDashboard';
-import TeamDashboard from './pages/TeamDashboard';
-import AdminManagement from './pages/AdminManagement';
-import Workspaces from './pages/Workspaces';
-import Announcements from './pages/Announcements';
+
+// Shared Pages
+import MetaAdsDashboard from './pages/MetaAdsDashboard';
+import MetaAdsCampaigns from './pages/MetaAdsCampaigns';
+import MetaAdsLeads from './pages/MetaAdsLeads';
+import FileManager from './pages/FileManager';
+import DirectMessages from './pages/DirectMessages';
 import Settings from './pages/Settings';
 
-import { Box, CircularProgress } from '@mui/material';
-import Layout from './components/Layout';
+import { useAuth } from './hooks/useAuth';
+import { LoadingSpinner } from './components/LoadingSpinner';
 
-const PrivateRoute = ({ children }) => {
-  const { user, loading } = useContext(AuthContext);
-  
+const App = () => {
+  const { user, loading } = useAuth();
+
   if (loading) {
-    return (
-      <Box sx={{ display: 'flex', justifyContent: 'center', alignItems: 'center', height: '100vh', backgroundColor: '#f4f5f7' }}>
-        <CircularProgress />
-      </Box>
-    );
+    return <LoadingSpinner fullScreen />;
   }
 
-  return user ? <Layout>{children}</Layout> : <Navigate to="/login" />;
-};
+  // Auto redirect root based on role
+  const getRootRedirect = () => {
+    if (!user) return '/login';
+    if (user.role === 'Admin') return '/admin';
+    if (user.role === 'Member') return '/member';
+    if (user.role === 'Client') return '/client';
+    return '/login';
+  };
 
-function App() {
   return (
-    <Router>
-      <Routes>
-        <Route path="/login" element={<Login />} />
-        <Route path="/register" element={<Register />} />
-        <Route path="/forgot-password" element={<ForgotPassword />} />
-        <Route path="/" element={<PrivateRoute><Dashboard /></PrivateRoute>} />
-        <Route path="/workspaces" element={<PrivateRoute><Workspaces /></PrivateRoute>} />
-        <Route path="/channels" element={<PrivateRoute><ChannelChat /></PrivateRoute>} />
-        <Route path="/dms" element={<PrivateRoute><DirectMessages /></PrivateRoute>} />
-        <Route path="/files" element={<PrivateRoute><FileManager /></PrivateRoute>} />
-        <Route path="/settings" element={<PrivateRoute><Settings /></PrivateRoute>} />
-        <Route path="/admin" element={<PrivateRoute><AdminPanel /></PrivateRoute>} />
-        <Route path="/projects" element={<PrivateRoute><ClientDashboard /></PrivateRoute>} />
-        <Route path="/attendance" element={<PrivateRoute><TeamDashboard /></PrivateRoute>} />
-        <Route path="/admin-suite" element={<PrivateRoute><AdminManagement /></PrivateRoute>} />
-        <Route path="/announcements" element={<PrivateRoute><Announcements /></PrivateRoute>} />
-      </Routes>
-    </Router>
+    <Routes>
+      {/* Public Routes */}
+      <Route path="/login" element={!user ? <Login /> : <Navigate to={getRootRedirect()} />} />
+      <Route path="/register" element={!user ? <Register /> : <Navigate to={getRootRedirect()} />} />
+      <Route path="/" element={<Navigate to={getRootRedirect()} replace />} />
+
+      {/* Admin Routes */}
+      <Route path="/admin" element={<Layout allowedRoles={['Admin']} />}>
+        <Route index element={<Dashboard />} />
+        <Route path="clients" element={<ClientsPage />} />
+        <Route path="members" element={<MembersPage />} />
+        <Route path="office-workspaces" element={<OfficeWorkspaces />} />
+        <Route path="office-workspaces/:id" element={<WorkspaceDetails type="office" />} />
+        <Route path="client-workspaces" element={<ClientWorkspaces />} />
+        <Route path="client-workspaces/:id" element={<WorkspaceDetails type="client" />} />
+      </Route>
+
+      {/* Member Routes */}
+      <Route path="/member" element={<Layout allowedRoles={['Member', 'Admin']} />}>
+        <Route index element={<MemberDashboard />} />
+      </Route>
+
+      {/* Client Routes */}
+      <Route path="/client" element={<Layout allowedRoles={['Client', 'Admin']} />}>
+        <Route index element={<ClientDashboard />} />
+      </Route>
+
+      {/* Shared Routes (Accessible based on specific rules, handled in component or by having it under Layout) */}
+      <Route element={<Layout allowedRoles={['Admin', 'Member', 'Client']} />}>
+        <Route path="/meta-ads" element={<MetaAdsDashboard />} />
+        <Route path="/meta-ads/campaigns" element={<MetaAdsCampaigns />} />
+        <Route path="/leads" element={<MetaAdsLeads />} />
+        <Route path="/files" element={<FileManager />} />
+        <Route path="/messages" element={<DirectMessages />} />
+        <Route path="/reports" element={<ReportsPage />} />
+        <Route path="/settings" element={<Settings />} />
+      </Route>
+      
+      {/* 404 Catch All */}
+      <Route path="*" element={<Navigate to={getRootRedirect()} replace />} />
+    </Routes>
   );
-}
+};
 
 export default App;

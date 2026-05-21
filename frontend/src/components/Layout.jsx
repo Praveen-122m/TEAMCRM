@@ -1,43 +1,45 @@
-import React, { useState, useContext, useEffect, useRef } from 'react';
-import { Box, Snackbar, Alert, Button, Typography, Avatar, Paper, Dialog, IconButton } from '@mui/material';
-import CloseIcon from '@mui/icons-material/Close';
-import VideocamOutlinedIcon from '@mui/icons-material/VideocamOutlined';
-import Sidebar from './Sidebar';
-import TopNav from './TopNav';
-import { SocketContext } from '../context/SocketContext';
-import { AuthContext } from '../context/AuthContext';
-import { useNavigate, useLocation } from 'react-router-dom';
+import { useState } from 'react';
+import { Outlet, Navigate } from 'react-router-dom';
+import { Sidebar } from './Sidebar';
+import { TopNav } from './TopNav';
+import { useAuth } from '../hooks/useAuth';
+import { LoadingSpinner } from './LoadingSpinner';
 
-const drawerWidth = 260;
+export const Layout = ({ allowedRoles = [] }) => {
+  const { user, loading } = useAuth();
+  const [sidebarOpen, setSidebarOpen] = useState(false);
 
-const Layout = ({ children }) => {
-  const { socket } = useContext(SocketContext);
-  const { user } = useContext(AuthContext);
-  const navigate = useNavigate();
-  const location = useLocation();
-  
+  if (loading) {
+    return <LoadingSpinner fullScreen />;
+  }
+
+  if (!user) {
+    return <Navigate to="/login" replace />;
+  }
+
+  if (allowedRoles.length > 0 && !allowedRoles.includes(user.role)) {
+    // Redirect to their appropriate dashboard if unauthorized for this route
+    const roleRoutes = {
+      Admin: '/admin',
+      Member: '/member',
+      Client: '/client'
+    };
+    return <Navigate to={roleRoutes[user.role] || '/login'} replace />;
+  }
+
   return (
-    <Box sx={{ display: 'flex', height: '100vh', backgroundColor: '#fcfcfc' }}>
-      <Sidebar />
-      <Box sx={{ flexGrow: 1, display: 'flex', flexDirection: 'column', overflow: 'hidden' }}>
-        <TopNav />
-        <Box
-          component="main"
-          sx={{
-            flexGrow: 1,
-            pt: 2,
-            pb: 2,
-            px: 4,
-            width: '100%',
-            overflowY: 'auto',
-            backgroundColor: '#fcfcfc'
-          }}
-        >
-          {children}
-        </Box>
-      </Box>
-    </Box>
+    <div className="flex h-screen overflow-hidden bg-crm-dark">
+      <Sidebar isOpen={sidebarOpen} onClose={() => setSidebarOpen(false)} />
+      
+      <div className="flex-1 flex flex-col min-w-0 overflow-hidden">
+        <TopNav onMenuClick={() => setSidebarOpen(true)} />
+        
+        <main className="flex-1 overflow-y-auto p-4 lg:p-8 custom-scrollbar">
+          <div className="mx-auto max-w-7xl">
+            <Outlet />
+          </div>
+        </main>
+      </div>
+    </div>
   );
 };
-
-export default Layout;

@@ -110,6 +110,7 @@ export const SocketProvider = ({ children }) => {
         newSocket.off('connect');
         newSocket.off('message_received');
         newSocket.off('mention_detected');
+        newSocket.off('announcement_received');
         newSocket.disconnect();
       };
     }

@@ -195,14 +195,22 @@ const getThread = async (req, res) => {
 const getDirectMessages = async (req, res) => {
   try {
     const { userId } = req.params;
+    const { workspaceId } = req.query;
+
+    const where = {
+      isDirectMessage: true,
+      [Op.or]: [
+        { senderId: req.user._id, receiverId: userId },
+        { senderId: userId, receiverId: req.user._id }
+      ]
+    };
+
+    if (workspaceId) {
+      where.workspaceId = workspaceId;
+    }
+
     const messages = await Message.findAll({
-      where: {
-        isDirectMessage: true,
-        [Op.or]: [
-          { senderId: req.user._id, receiverId: userId },
-          { senderId: userId, receiverId: req.user._id }
-        ]
-      },
+      where,
       include: [
         { model: User, as: 'sender', attributes: ['_id', 'name', 'profileImage'] },
         { model: User, as: 'receiver', attributes: ['_id', 'name', 'profileImage'] },
@@ -359,4 +367,39 @@ const getPendingMessages = async (req, res) => {
   }
 };
 
-module.exports = { getMessages, sendMessage, toggleReaction, getConversations, getDirectMessages, getThread, getFiles, deleteMessage, approveMessage, getPendingMessages };
+// @desc    Get all files shared in a specific workspace
+// @route   GET /api/messages/workspace/:workspaceId/files
+// @access  Private
+const getWorkspaceFiles = async (req, res) => {
+  try {
+    const { workspaceId } = req.params;
+    const files = await Message.findAll({
+      where: {
+        workspaceId,
+        fileUrl: { [Op.ne]: null }
+      },
+      include: [
+        { model: User, as: 'sender', attributes: ['_id', 'name', 'profileImage'] }
+      ],
+      order: [['createdAt', 'DESC']]
+    });
+    res.json(files);
+  } catch (error) {
+    console.error('[GET_WORKSPACE_FILES_ERR]', error);
+    res.status(500).json({ message: 'Server Error', error: error.message });
+  }
+};
+
+module.exports = { 
+  getMessages, 
+  sendMessage, 
+  toggleReaction, 
+  getConversations, 
+  getDirectMessages, 
+  getWorkspaceFiles,
+  getThread, 
+  getFiles, 
+  deleteMessage, 
+  approveMessage, 
+  getPendingMessages 
+};

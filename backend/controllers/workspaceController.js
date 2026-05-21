@@ -7,7 +7,7 @@ const Channel = require('../models/Channel');
 // @access  Private
 const createWorkspace = async (req, res) => {
   try {
-    const { name, description } = req.body;
+    const { name, description, type } = req.body;
     
     const inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase();
 
@@ -15,7 +15,8 @@ const createWorkspace = async (req, res) => {
       name,
       description,
       inviteCode,
-      ownerId: req.user._id
+      ownerId: req.user._id,
+      type: type || 'office'
     });
 
     // Add user as admin and member
@@ -55,6 +56,7 @@ const createWorkspace = async (req, res) => {
 // @access  Private
 const getWorkspaces = async (req, res) => {
   try {
+    const { type } = req.query;
     const user = await User.findByPk(req.user._id);
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
@@ -67,8 +69,13 @@ const getWorkspaces = async (req, res) => {
     
     const workspaceIds = userWorkspaces.map(w => w._id);
 
+    const whereClause = { _id: workspaceIds };
+    if (type) {
+      whereClause.type = type;
+    }
+
     const workspaces = await Workspace.findAll({
-      where: { _id: workspaceIds },
+      where: whereClause,
       include: [
         {
           model: User,

@@ -23,6 +23,11 @@ const Workspace = sequelize.define('Workspace', {
   ownerId: {
     type: DataTypes.UUID,
     allowNull: false
+  },
+  type: {
+    type: DataTypes.ENUM('office', 'client'),
+    defaultValue: 'office',
+    allowNull: false
   }
 }, {
   timestamps: true

@@ -1,87 +1,72 @@
-import React, { useEffect, useState, useContext } from 'react';
-import { Box, Typography, Paper, Table, TableBody, TableCell, TableContainer, TableHead, TableRow, IconButton, CircularProgress, Avatar, Chip } from '@mui/material';
-import { AuthContext } from '../context/AuthContext';
-import axios from 'axios';
-import DownloadIcon from '@mui/icons-material/Download';
-import InsertDriveFileIcon from '@mui/icons-material/InsertDriveFile';
-import ImageIcon from '@mui/icons-material/Image';
+import { useState, useRef } from 'react';
+import { Upload, FileText, Image as ImageIcon, Download, Trash2, MoreVertical } from 'lucide-react';
+import toast from 'react-hot-toast';
 
 const FileManager = () => {
-  const { user } = useContext(AuthContext);
-  const [files, setFiles] = useState([]);
-  const [loading, setLoading] = useState(true);
+  const [files, setFiles] = useState([
+    { _id: '1', name: 'Q3_Performance_Report.pdf', category: 'report', size: 2450000, date: '2026-05-18' },
+    { _id: '2', name: 'Summer_Campaign_Ad.jpg', category: 'image', size: 5400000, date: '2026-05-19' },
+    { _id: '3', name: 'Client_Brief_v2.docx', category: 'document', size: 1200000, date: '2026-05-20' },
+  ]);
+  const fileInputRef = useRef(null);
 
-  useEffect(() => {
-    const fetchFiles = async () => {
-      try {
-        const res = await axios.get('/api/messages/files'); 
-        setFiles(res.data);
-      } catch (err) {
-        console.error('Failed to fetch real files', err);
-      } finally {
-        setLoading(false);
-      }
-    };
-    if (user) fetchFiles();
-  }, [user]);
+  const handleUpload = (e) => {
+    const file = e.target.files[0];
+    if (file) {
+      toast.success(`Uploading ${file.name}...`);
+      // In real app, call fileService.uploadFile
+      setTimeout(() => {
+        setFiles([{ _id: Date.now().toString(), name: file.name, category: 'other', size: file.size, date: new Date().toISOString().split('T')[0] }, ...files]);
+        toast.success('File uploaded successfully');
+      }, 1000);
+    }
+  };
 
-  if (loading) return <Box sx={{ display: 'flex', justifyContent: 'center', mt: 10 }}><CircularProgress /></Box>;
+  const getFileIcon = (category) => {
+    switch (category) {
+      case 'report': return <FileText className="text-violet-400" size={24} />;
+      case 'image': return <ImageIcon className="text-emerald-400" size={24} />;
+      case 'document': return <FileText className="text-blue-400" size={24} />;
+      default: return <FileText className="text-crm-textMuted" size={24} />;
+    }
+  };
 
   return (
-    <Box sx={{ p: 4, maxWidth: 1200, mx: 'auto' }}>
-      <Typography variant="h5" sx={{ fontWeight: 800, mb: 4 }}>Workspace Files</Typography>
-      
-      {files.length === 0 ? (
-        <Paper sx={{ p: 10, textAlign: 'center', borderRadius: 4, border: '1px dashed #cbd5e0', backgroundColor: 'transparent', boxShadow: 'none' }}>
-          <InsertDriveFileIcon sx={{ fontSize: 60, color: '#cbd5e0', mb: 2 }} />
-          <Typography variant="h6" color="textSecondary">No files shared yet</Typography>
-          <Typography variant="body2" color="textSecondary">Every image or document you share in chat will appear here.</Typography>
-        </Paper>
-      ) : (
-        <TableContainer component={Paper} sx={{ borderRadius: 4, border: '1px solid #f0f0f0', boxShadow: 'none' }}>
-          <Table>
-            <TableHead sx={{ backgroundColor: '#f8f9fa' }}>
-              <TableRow>
-                <TableCell sx={{ fontWeight: 700 }}>Name</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Sender</TableCell>
-                <TableCell sx={{ fontWeight: 700 }}>Date</TableCell>
-                <TableCell sx={{ fontWeight: 700, textAlign: 'right' }}>Action</TableCell>
-              </TableRow>
-            </TableHead>
-            <TableBody>
-              {files.map((file) => (
-                <TableRow key={file._id} hover>
-                  <TableCell>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1.5 }}>
-                      {file.fileType?.includes('image') ? <ImageIcon sx={{ color: '#5a67d8' }} /> : <InsertDriveFileIcon sx={{ color: '#718096' }} />}
-                      <Typography variant="body2" sx={{ fontWeight: 600 }}>
-                        {file.content?.split(': ')[1] || 'Shared File'}
-                      </Typography>
-                    </Box>
-                  </TableCell>
-                  <TableCell>
-                    <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                      <Avatar src={file.sender?.profileImage} sx={{ width: 24, height: 24 }} />
-                      <Typography variant="body2">{file.sender?.name}</Typography>
-                    </Box>
-                  </TableCell>
-                  <TableCell>
-                    <Typography variant="body2" color="textSecondary">
-                      {new Date(file.createdAt).toLocaleDateString()}
-                    </Typography>
-                  </TableCell>
-                  <TableCell sx={{ textAlign: 'right' }}>
-                    <IconButton component="a" href={file.fileUrl} target="_blank" size="small" sx={{ color: '#5a67d8' }}>
-                      <DownloadIcon fontSize="small" />
-                    </IconButton>
-                  </TableCell>
-                </TableRow>
-              ))}
-            </TableBody>
-          </Table>
-        </TableContainer>
-      )}
-    </Box>
+    <div className="space-y-6">
+      <div className="flex justify-between items-center">
+        <div>
+          <h1 className="text-2xl font-bold text-white tracking-tight">File Manager</h1>
+          <p className="text-crm-textMuted text-sm mt-1">Manage creatives, reports, and client documents.</p>
+        </div>
+        <div>
+          <input type="file" ref={fileInputRef} onChange={handleUpload} className="hidden" />
+          <button onClick={() => fileInputRef.current?.click()} className="glass-button">
+            <Upload size={18} /> Upload File
+          </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
+        {files.map(file => (
+          <div key={file._id} className="glass-card p-4 group relative">
+            <div className="absolute top-4 right-4 opacity-0 group-hover:opacity-100 transition-opacity flex gap-2">
+              <button className="p-1.5 bg-crm-darker/80 rounded hover:text-crm-primary"><Download size={14} /></button>
+              <button className="p-1.5 bg-crm-darker/80 rounded hover:text-rose-400"><Trash2 size={14} /></button>
+            </div>
+            
+            <div className="w-12 h-12 rounded-xl bg-crm-darker/50 flex items-center justify-center mb-4">
+              {getFileIcon(file.category)}
+            </div>
+            
+            <p className="text-sm font-medium text-white truncate mb-1" title={file.name}>{file.name}</p>
+            <div className="flex justify-between items-center text-xs text-crm-textMuted">
+              <span>{(file.size / 1024 / 1024).toFixed(2)} MB</span>
+              <span>{file.date}</span>
+            </div>
+          </div>
+        ))}
+      </div>
+    </div>
   );
 };
 

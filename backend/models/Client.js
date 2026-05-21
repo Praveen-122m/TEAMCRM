@@ -20,6 +20,18 @@ const Client = sequelize.define('Client', {
     type: DataTypes.STRING,
     defaultValue: ''
   },
+  contactPerson: {
+    type: DataTypes.STRING,
+    defaultValue: ''
+  },
+  email: {
+    type: DataTypes.STRING,
+    defaultValue: ''
+  },
+  phone: {
+    type: DataTypes.STRING,
+    defaultValue: ''
+  },
   address: {
     type: DataTypes.STRING,
     defaultValue: ''
@@ -27,6 +39,14 @@ const Client = sequelize.define('Client', {
   website: {
     type: DataTypes.STRING,
     defaultValue: ''
+  },
+  monthlyBudget: {
+    type: DataTypes.DECIMAL(12, 2),
+    defaultValue: 0.00
+  },
+  status: {
+    type: DataTypes.ENUM('active', 'inactive', 'archived'),
+    defaultValue: 'active'
   },
   notes: {
     type: DataTypes.TEXT,

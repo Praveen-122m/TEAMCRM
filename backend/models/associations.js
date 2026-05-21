@@ -12,15 +12,44 @@ const ProjectRequest = require('./ProjectRequest');
 const Announcement = require('./Announcement');
 const AnnouncementReply = require('./AnnouncementReply');
 const Client = require('./Client');
+const Member = require('./Member');
+const ClientAssignment = require('./ClientAssignment');
+const MetaAdsCampaign = require('./MetaAdsCampaign');
+const MetaAdsConnection = require('./MetaAdsConnection');
+const MetaAdsLead = require('./MetaAdsLead');
+const File = require('./File');
+const Report = require('./Report');
 
 function initAssociations() {
   console.log('[DB] Initializing database model associations...');
 
+  // ══════════════════════════════════════════════════
   // User <-> Client (One-to-One)
+  // ══════════════════════════════════════════════════
   User.hasOne(Client, { foreignKey: 'userId', as: 'clientProfile', onDelete: 'CASCADE' });
   Client.belongsTo(User, { foreignKey: 'userId', as: 'user' });
 
+  // ══════════════════════════════════════════════════
+  // User <-> Member (One-to-One)
+  // ══════════════════════════════════════════════════
+  User.hasOne(Member, { foreignKey: 'userId', as: 'memberProfile', onDelete: 'CASCADE' });
+  Member.belongsTo(User, { foreignKey: 'userId', as: 'user' });
+
+  // ══════════════════════════════════════════════════
+  // Client <-> Member Assignments (Many-to-Many via ClientAssignment)
+  // ══════════════════════════════════════════════════
+  Client.hasMany(ClientAssignment, { foreignKey: 'clientId', as: 'assignments', onDelete: 'CASCADE' });
+  ClientAssignment.belongsTo(Client, { foreignKey: 'clientId', as: 'client' });
+
+  Member.hasMany(ClientAssignment, { foreignKey: 'memberId', as: 'assignments', onDelete: 'CASCADE' });
+  ClientAssignment.belongsTo(Member, { foreignKey: 'memberId', as: 'member' });
+
+  User.hasMany(ClientAssignment, { foreignKey: 'assignedById', as: 'madeAssignments' });
+  ClientAssignment.belongsTo(User, { foreignKey: 'assignedById', as: 'assignedBy' });
+
+  // ══════════════════════════════════════════════════
   // User <-> Workspace (Many-to-Many for members and admins)
+  // ══════════════════════════════════════════════════
   User.belongsToMany(Workspace, { as: 'workspaces', through: 'WorkspaceMembers', foreignKey: 'userId', otherKey: 'workspaceId' });
   Workspace.belongsToMany(User, { as: 'members', through: 'WorkspaceMembers', foreignKey: 'workspaceId', otherKey: 'userId' });
 
@@ -32,7 +61,9 @@ function initAssociations() {
   Workspace.belongsToMany(User, { as: 'admins', through: 'WorkspaceAdmins', foreignKey: 'workspaceId', otherKey: 'userId' });
   User.belongsToMany(Workspace, { as: 'administeredWorkspaces', through: 'WorkspaceAdmins', foreignKey: 'userId', otherKey: 'workspaceId' });
 
-  // User <-> Channel (Many-to-Many for private/channel memberships)
+  // ══════════════════════════════════════════════════
+  // User <-> Channel (Many-to-Many)
+  // ══════════════════════════════════════════════════
   User.belongsToMany(Channel, { as: 'channels', through: 'ChannelMembers', foreignKey: 'userId', otherKey: 'channelId' });
   Channel.belongsToMany(User, { as: 'members', through: 'ChannelMembers', foreignKey: 'channelId', otherKey: 'userId' });
 
@@ -40,7 +71,9 @@ function initAssociations() {
   Workspace.hasMany(Channel, { foreignKey: 'workspaceId', onDelete: 'CASCADE' });
   Channel.belongsTo(Workspace, { foreignKey: 'workspaceId' });
 
+  // ══════════════════════════════════════════════════
   // Message Associations
+  // ══════════════════════════════════════════════════
   User.hasMany(Message, { foreignKey: 'senderId' });
   Message.belongsTo(User, { as: 'sender', foreignKey: 'senderId' });
 
@@ -64,28 +97,36 @@ function initAssociations() {
   User.hasMany(MessageReaction, { foreignKey: 'userId' });
   MessageReaction.belongsTo(User, { foreignKey: 'userId' });
 
+  // ══════════════════════════════════════════════════
   // Meeting Associations
+  // ══════════════════════════════════════════════════
   Workspace.hasMany(Meeting, { foreignKey: 'workspaceId', onDelete: 'CASCADE' });
   Meeting.belongsTo(Workspace, { foreignKey: 'workspaceId' });
 
   User.hasMany(Meeting, { foreignKey: 'createdById' });
   Meeting.belongsTo(User, { as: 'createdBy', foreignKey: 'createdById' });
 
+  // ══════════════════════════════════════════════════
   // Notification Associations
+  // ══════════════════════════════════════════════════
   User.hasMany(Notification, { as: 'notifications', foreignKey: 'recipientId', onDelete: 'CASCADE' });
   Notification.belongsTo(User, { as: 'recipient', foreignKey: 'recipientId' });
 
   User.hasMany(Notification, { as: 'sentNotifications', foreignKey: 'senderId' });
   Notification.belongsTo(User, { as: 'sender', foreignKey: 'senderId' });
 
+  // ══════════════════════════════════════════════════
   // Attendance Associations
+  // ══════════════════════════════════════════════════
   User.hasMany(Attendance, { foreignKey: 'userId', onDelete: 'CASCADE' });
   Attendance.belongsTo(User, { as: 'user', foreignKey: 'userId' });
 
   Workspace.hasMany(Attendance, { foreignKey: 'workspaceId', onDelete: 'CASCADE' });
   Attendance.belongsTo(Workspace, { foreignKey: 'workspaceId' });
 
+  // ══════════════════════════════════════════════════
   // Project Associations
+  // ══════════════════════════════════════════════════
   Workspace.hasMany(Project, { foreignKey: 'workspaceId', onDelete: 'CASCADE' });
   Project.belongsTo(Workspace, { foreignKey: 'workspaceId' });
 
@@ -106,7 +147,9 @@ function initAssociations() {
   Workspace.hasMany(ProjectRequest, { foreignKey: 'workspaceId', onDelete: 'CASCADE' });
   ProjectRequest.belongsTo(Workspace, { foreignKey: 'workspaceId' });
 
+  // ══════════════════════════════════════════════════
   // Announcement Associations
+  // ══════════════════════════════════════════════════
   Workspace.hasMany(Announcement, { foreignKey: 'workspaceId', onDelete: 'CASCADE' });
   Announcement.belongsTo(Workspace, { foreignKey: 'workspaceId' });
 
@@ -128,6 +171,45 @@ function initAssociations() {
 
   User.hasMany(AnnouncementReply, { foreignKey: 'userId' });
   AnnouncementReply.belongsTo(User, { as: 'user', foreignKey: 'userId' });
+
+  // ══════════════════════════════════════════════════
+  // Meta Ads Associations
+  // ══════════════════════════════════════════════════
+  Workspace.hasMany(MetaAdsCampaign, { foreignKey: 'workspaceId', onDelete: 'CASCADE' });
+  MetaAdsCampaign.belongsTo(Workspace, { foreignKey: 'workspaceId' });
+
+  Workspace.hasMany(MetaAdsLead, { foreignKey: 'workspaceId', onDelete: 'CASCADE' });
+  MetaAdsLead.belongsTo(Workspace, { foreignKey: 'workspaceId' });
+
+  Workspace.hasOne(MetaAdsConnection, { foreignKey: 'workspaceId', onDelete: 'CASCADE' });
+  MetaAdsConnection.belongsTo(Workspace, { foreignKey: 'workspaceId' });
+
+  MetaAdsCampaign.hasMany(MetaAdsLead, { foreignKey: 'campaignId', onDelete: 'SET NULL' });
+  MetaAdsLead.belongsTo(MetaAdsCampaign, { foreignKey: 'campaignId' });
+
+  // ══════════════════════════════════════════════════
+  // File Associations
+  // ══════════════════════════════════════════════════
+  User.hasMany(File, { foreignKey: 'uploadedById', as: 'uploadedFiles' });
+  File.belongsTo(User, { foreignKey: 'uploadedById', as: 'uploadedBy' });
+
+  Workspace.hasMany(File, { foreignKey: 'workspaceId', onDelete: 'CASCADE' });
+  File.belongsTo(Workspace, { foreignKey: 'workspaceId' });
+
+  Client.hasMany(File, { foreignKey: 'clientId', as: 'files', onDelete: 'SET NULL' });
+  File.belongsTo(Client, { foreignKey: 'clientId', as: 'client' });
+
+  // ══════════════════════════════════════════════════
+  // Report Associations
+  // ══════════════════════════════════════════════════
+  User.hasMany(Report, { foreignKey: 'generatedById', as: 'generatedReports' });
+  Report.belongsTo(User, { foreignKey: 'generatedById', as: 'generatedBy' });
+
+  Workspace.hasMany(Report, { foreignKey: 'workspaceId', onDelete: 'CASCADE' });
+  Report.belongsTo(Workspace, { foreignKey: 'workspaceId' });
+
+  Client.hasMany(Report, { foreignKey: 'clientId', as: 'reports', onDelete: 'SET NULL' });
+  Report.belongsTo(Client, { foreignKey: 'clientId', as: 'reportClient' });
 }
 
 module.exports = initAssociations;

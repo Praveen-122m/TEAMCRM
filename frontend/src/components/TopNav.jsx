@@ -1,160 +1,78 @@
-import React, { useContext, useState, useEffect } from 'react';
-import { 
-  Box, Typography, Avatar, IconButton, Badge, Menu, MenuItem, 
-  List, ListItem, ListItemAvatar, ListItemText, Divider, Button, Fade
-} from '@mui/material';
-import { AuthContext } from '../context/AuthContext';
-import { SocketContext } from '../context/SocketContext';
-import axios from 'axios';
-import NotificationsNoneOutlinedIcon from '@mui/icons-material/NotificationsNoneOutlined';
-import HelpOutlineOutlinedIcon from '@mui/icons-material/HelpOutlineOutlined';
-import ChatBubbleOutlineOutlinedIcon from '@mui/icons-material/ChatBubbleOutlineOutlined';
-import AlternateEmailIcon from '@mui/icons-material/AlternateEmail';
-import { useNavigate } from 'react-router-dom';
+import { useState } from 'react';
+import { Bell, Search, User, LogOut, Settings, Menu } from 'lucide-react';
+import { useAuth } from '../hooks/useAuth';
 
-const TopNav = () => {
-  const { user, activeWorkspace } = useContext(AuthContext);
-  const { unreadCounts, totalUnread, clearUnread } = useContext(SocketContext);
-  const [workspaceName, setWorkspaceName] = useState('Team Workspace');
-  const [anchorEl, setAnchorEl] = useState(null);
-  const navigate = useNavigate();
-
-  useEffect(() => {
-    const fetchWorkspaceName = async () => {
-      if (!activeWorkspace) return;
-      try {
-        const res = await axios.get('/api/workspaces');
-        if (Array.isArray(res.data)) {
-          const current = res.data.find(w => w._id === activeWorkspace);
-          if (current) setWorkspaceName(current.name);
-        }
-      } catch (err) {
-        console.error('TopNav Workspace Fetch Error:', err);
-      }
-    };
-    fetchWorkspaceName();
-  }, [activeWorkspace]);
-
-  const handleOpenNotifications = (event) => setAnchorEl(event.currentTarget);
-  const handleCloseNotifications = () => setAnchorEl(null);
-
-  const handleNotificationClick = (notif) => {
-    if (notif.type === 'dm') {
-      navigate('/dms', { state: { selectedUser: { _id: notif.id } } });
-    } else if (notif.type === 'mention') {
-      navigate('/channels', { state: { activeChannelId: notif.channelId } });
-    } else if (notif.type === 'announcement') {
-      navigate('/announcements');
-    }
-    clearUnread(notif.id);
-    handleCloseNotifications();
-  };
-
-  // Convert unreadCounts map to a list for rendering
-  const notifications = Object.entries(unreadCounts)
-    .filter(([_, data]) => data.count > 0)
-    .map(([id, data]) => ({ id, ...data }));
+export const TopNav = ({ onMenuClick }) => {
+  const { user, logout } = useAuth();
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
 
   return (
-    <Box sx={{ 
-      height: 64, display: 'flex', alignItems: 'center', justifyContent: 'space-between', 
-      px: 3, backgroundColor: '#ffffff', borderBottom: '1px solid #f0f0f0',
-      zIndex: 1100, position: 'sticky', top: 0
-    }}>
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-        <Typography variant="subtitle1" sx={{ fontWeight: 800, color: '#1a202c' }}>
-          Workspace: <span style={{ color: '#5a67d8' }}>{workspaceName}</span>
-        </Typography>
-      </Box>
-
-      <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>
-        <IconButton size="small" sx={{ color: '#718096' }}>
-          <HelpOutlineOutlinedIcon fontSize="small" />
-        </IconButton>
-        
-        <IconButton size="small" sx={{ color: '#718096' }} onClick={handleOpenNotifications}>
-          <Badge badgeContent={totalUnread} color="error" overlap="rectangular">
-            <NotificationsNoneOutlinedIcon fontSize="small" />
-          </Badge>
-        </IconButton>
-
-        <Menu
-          anchorEl={anchorEl}
-          open={Boolean(anchorEl)}
-          onClose={handleCloseNotifications}
-          TransitionComponent={Fade}
-          PaperProps={{
-            sx: { 
-              mt: 1.5, borderRadius: 4, width: 360, 
-              boxShadow: '0 8px 30px rgba(0,0,0,0.12)', border: '1px solid #f1f3f5' 
-            }
-          }}
+    <header className="h-16 border-b border-crm-border bg-crm-card/50 backdrop-blur-md sticky top-0 z-40 flex items-center justify-between px-4 lg:px-8">
+      <div className="flex items-center gap-4">
+        <button 
+          onClick={onMenuClick}
+          className="lg:hidden p-2 rounded-lg text-crm-textMuted hover:text-white hover:bg-crm-border/30 transition-colors"
         >
-          <Box sx={{ p: 2, pb: 1, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
-            <Typography variant="subtitle2" sx={{ fontWeight: 900 }}>Notification Center</Typography>
-            {totalUnread > 0 && <Badge badgeContent={totalUnread} color="error" sx={{ mr: 2 }} />}
-          </Box>
-          <Divider />
-          <List sx={{ p: 0, maxHeight: 400, overflowY: 'auto' }}>
-            {notifications.length > 0 ? notifications.map((notif) => (
-              <MenuItem 
-                key={notif.id} 
-                onClick={() => handleNotificationClick(notif)}
-                sx={{ py: 2, px: 2, '&:hover': { backgroundColor: '#f8fafc' } }}
-              >
-                <ListItemAvatar sx={{ minWidth: 56 }}>
-                  <Badge 
-                    overlap="circular" 
-                    anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }}
-                    badgeContent={notif.type === 'dm' ? <ChatBubbleOutlineOutlinedIcon sx={{ fontSize: 10, color: 'white' }} /> : <AlternateEmailIcon sx={{ fontSize: 10, color: 'white' }} />}
-                    sx={{ '& .MuiBadge-badge': { backgroundColor: notif.type === 'dm' ? '#5a67d8' : '#ed8936', width: 16, height: 16, borderRadius: '50%', minWidth: 16 } }}
-                  >
-                    <Avatar src={notif.profileImage} sx={{ width: 44, height: 44, borderRadius: 2.5 }} />
-                  </Badge>
-                </ListItemAvatar>
-                <ListItemText 
-                  primary={notif.name} 
-                  secondary={notif.lastMessage}
-                  primaryTypographyProps={{ fontWeight: 900, fontSize: '0.85rem', color: '#1a202c' }}
-                  secondaryTypographyProps={{ 
-                    fontWeight: 600, fontSize: '0.75rem', color: '#718096',
-                    overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap'
-                  }}
-                />
-                {notif.count > 0 && (
-                  <Box sx={{ 
-                    ml: 1, bgcolor: notif.type === 'dm' ? '#5a67d8' : '#ed8936', color: 'white', borderRadius: 1.5, 
-                    px: 0.8, py: 0.2, fontSize: '0.65rem', fontWeight: 900 
-                  }}>
-                    {notif.count}
-                  </Box>
-                )}
-              </MenuItem>
-            )) : (
-              <Box sx={{ p: 4, textAlign: 'center' }}>
-                <Typography variant="body2" color="textSecondary" sx={{ fontWeight: 700 }}>No new alerts</Typography>
-              </Box>
-            )}
-          </List>
-          {notifications.length > 0 && (
-            <>
-              <Divider />
-              <Box sx={{ p: 1.5, textAlign: 'center' }}>
-                <Button fullWidth size="small" onClick={() => navigate('/dms')} sx={{ textTransform: 'none', fontWeight: 900, color: '#5a67d8' }}>View All Activity</Button>
-              </Box>
-            </>
-          )}
-        </Menu>
+          <Menu size={20} />
+        </button>
+        
+        <div className="hidden md:flex items-center relative">
+          <Search className="absolute left-3 text-crm-textMuted" size={18} />
+          <input 
+            type="text" 
+            placeholder="Search campaigns, clients..." 
+            className="glass-input pl-10 w-64 lg:w-96 rounded-full bg-crm-darker/50"
+          />
+        </div>
+      </div>
 
-        <Box sx={{ ml: 1, display: 'flex', alignItems: 'center', gap: 1.5 }}>
-           <Typography variant="body2" sx={{ fontWeight: 700, display: { xs: 'none', sm: 'block' } }}>
-             {user?.name}
-           </Typography>
-           <Avatar src={user?.profileImage} sx={{ width: 32, height: 32, borderRadius: 1.5 }} />
-        </Box>
-      </Box>
-    </Box>
+      <div className="flex items-center gap-4">
+        <button className="relative p-2 text-crm-textMuted hover:text-white transition-colors">
+          <Bell size={20} />
+          <span className="absolute top-1 right-1 w-2 h-2 bg-rose-500 rounded-full"></span>
+        </button>
+
+        <div className="relative">
+          <button 
+            onClick={() => setShowProfileMenu(!showProfileMenu)}
+            className="flex items-center gap-3 p-1 pl-3 pr-1 rounded-full border border-crm-border hover:border-crm-primary/50 transition-colors bg-crm-darker/30"
+          >
+            <div className="flex flex-col items-end hidden sm:flex">
+              <span className="text-sm font-medium text-white">{user?.name || 'User'}</span>
+              <span className="text-xs text-crm-textMuted">{user?.role || 'Guest'}</span>
+            </div>
+            <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-crm-primary to-crm-accent flex items-center justify-center text-white font-bold text-sm">
+              {user?.name?.charAt(0) || 'U'}
+            </div>
+          </button>
+
+          {showProfileMenu && (
+            <div className="absolute right-0 mt-2 w-48 rounded-xl bg-crm-card border border-crm-border shadow-xl py-1 z-50">
+              <div className="px-4 py-2 border-b border-crm-border mb-1 sm:hidden">
+                <p className="text-sm font-medium text-white">{user?.name}</p>
+                <p className="text-xs text-crm-textMuted">{user?.role}</p>
+              </div>
+              <button 
+                onClick={() => {
+                  setShowProfileMenu(false);
+                  window.location.href = '/settings';
+                }}
+                className="w-full text-left px-4 py-2 text-sm text-crm-textMuted hover:text-white hover:bg-crm-border/30 flex items-center gap-2 transition-colors"
+              >
+                <Settings size={16} />
+                Settings
+              </button>
+              <button 
+                onClick={logout}
+                className="w-full text-left px-4 py-2 text-sm text-rose-400 hover:text-rose-300 hover:bg-rose-500/10 flex items-center gap-2 transition-colors"
+              >
+                <LogOut size={16} />
+                Logout
+              </button>
+            </div>
+          )}
+        </div>
+      </div>
+    </header>
   );
 };
-
-export default TopNav;

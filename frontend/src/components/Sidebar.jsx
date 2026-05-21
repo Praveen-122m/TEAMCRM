@@ -1,144 +1,134 @@
-import React, { useContext } from 'react';
-import { Box, List, ListItem, ListItemButton, ListItemIcon, ListItemText, Typography, Avatar, Divider, Badge, Tooltip } from '@mui/material';
-import { NavLink, useLocation, useNavigate } from 'react-router-dom';
-import { AuthContext } from '../context/AuthContext';
-import { SocketContext } from '../context/SocketContext';
-import HomeOutlinedIcon from '@mui/icons-material/HomeOutlined';
-import ChatBubbleOutlineOutlinedIcon from '@mui/icons-material/ChatBubbleOutlineOutlined';
-import ForumOutlinedIcon from '@mui/icons-material/ForumOutlined';
-import VideocamOutlinedIcon from '@mui/icons-material/VideocamOutlined';
-import FolderOpenOutlinedIcon from '@mui/icons-material/FolderOpenOutlined';
-import SettingsOutlinedIcon from '@mui/icons-material/SettingsOutlined';
-import LogoutOutlinedIcon from '@mui/icons-material/LogoutOutlined';
-import BusinessOutlinedIcon from '@mui/icons-material/BusinessOutlined';
+import { NavLink } from 'react-router-dom';
+import { 
+  LayoutDashboard, 
+  Users, 
+  UserSquare2, 
+  Megaphone, 
+  Target, 
+  FolderOpen, 
+  MessageSquare, 
+  BarChart3, 
+  Settings,
+  X,
+  Building,
+  Briefcase
+} from 'lucide-react';
+import { useAuth } from '../hooks/useAuth';
 
-const Sidebar = () => {
-  const { user, logout, activeWorkspace } = useContext(AuthContext);
-  const { totalUnread } = useContext(SocketContext);
-  const location = useLocation();
-  const navigate = useNavigate();
+export const Sidebar = ({ isOpen, onClose }) => {
+  const { user } = useAuth();
+  const role = user?.role || 'Guest';
 
-  const activeWorkspaceName = localStorage.getItem('activeWorkspaceName') || 'Select Workspace';
+  const menuItems = {
+    Admin: [
+      { name: 'Dashboard', path: '/admin', icon: LayoutDashboard },
+      { name: 'Office Workspaces', path: '/admin/office-workspaces', icon: Building },
+      { name: 'Client Workspaces', path: '/admin/client-workspaces', icon: Briefcase },
+      { name: 'Clients', path: '/admin/clients', icon: Users },
+      { name: 'Team Members', path: '/admin/members', icon: UserSquare2 },
+      { name: 'Meta Ads', path: '/meta-ads', icon: Megaphone },
+      { name: 'Lead Center', path: '/leads', icon: Target },
+      { name: 'Files', path: '/files', icon: FolderOpen },
+      { name: 'Messages', path: '/messages', icon: MessageSquare },
+      { name: 'Reports', path: '/reports', icon: BarChart3 },
+      { name: 'Settings', path: '/settings', icon: Settings },
+    ],
+    Member: [
+      { name: 'Dashboard', path: '/member', icon: LayoutDashboard },
+      { name: 'Assigned Clients', path: '/member/clients', icon: Users },
+      { name: 'Campaigns', path: '/meta-ads/campaigns', icon: Megaphone },
+      { name: 'Leads', path: '/leads', icon: Target },
+      { name: 'Messages', path: '/messages', icon: MessageSquare },
+      { name: 'Files', path: '/files', icon: FolderOpen },
+    ],
+    Client: [
+      { name: 'Dashboard', path: '/client', icon: LayoutDashboard },
+      { name: 'Meta Ads', path: '/meta-ads', icon: Megaphone },
+      { name: 'Campaigns', path: '/meta-ads/campaigns', icon: Target },
+      { name: 'Leads', path: '/leads', icon: Users },
+      { name: 'Reports', path: '/client/reports', icon: BarChart3 },
+      { name: 'Files', path: '/files', icon: FolderOpen },
+      { name: 'Messages', path: '/messages', icon: MessageSquare },
+    ]
+  };
 
-  const menuItems = [
-    { text: 'Dashboard', icon: <HomeOutlinedIcon />, path: '/' },
-    { text: 'Workspaces', icon: <BusinessOutlinedIcon />, path: '/workspaces' },
-    { text: 'Management', icon: <SettingsOutlinedIcon />, path: '/admin-suite', adminOnly: true },
-    { text: 'Announcements', icon: <ForumOutlinedIcon />, path: '/announcements' },
-    { text: 'Channels', icon: <ForumOutlinedIcon />, path: '/channels', memberOnly: true },
-    { text: 'Direct Messages', 
-      icon: (
-        <Badge badgeContent={totalUnread} color="error">
-          <ChatBubbleOutlineOutlinedIcon />
-        </Badge>
-      ), 
-      path: '/dms' 
-    },
-    { text: 'File Manager', icon: <FolderOpenOutlinedIcon />, path: '/files' },
-    { text: 'Settings', icon: <SettingsOutlinedIcon />, path: '/settings' },
-  ];
-
-  const visibleMenuItems = menuItems.filter(item => {
-    const role = user?.role?.toLowerCase();
-    if (item.adminOnly && role !== 'admin') return false;
-    if (item.clientOnly && role !== 'client') return false;
-    if (item.memberOnly && role !== 'member' && role !== 'admin') return false;
-    return true;
-  });
+  const items = menuItems[role] || [];
 
   return (
-    <Box sx={{ 
-      width: 260, 
-      height: '100vh', 
-      backgroundColor: '#ffffff', 
-      borderRight: '1px solid #e2e8f0',
-      display: 'flex',
-      flexDirection: 'column',
-      position: 'relative'
-    }}>
-      {/* Workspace Quick Switcher */}
-      <Box sx={{ p: 2, mb: 1 }}>
-        <ListItemButton 
-          onClick={() => navigate('/workspaces')}
-          sx={{ 
-            borderRadius: 3, 
-            backgroundColor: '#f8fafc',
-            border: '1px solid #e2e8f0',
-            p: 1.5,
-            transition: 'all 0.2s',
-            '&:hover': { backgroundColor: '#edf2f7', borderColor: '#5a67d8' }
-          }}
-        >
-          <Avatar 
-            sx={{ 
-              width: 36, height: 36, borderRadius: 2, 
-              backgroundColor: '#5a67d8', color: 'white',
-              fontSize: '1rem', fontWeight: 800, mr: 1.5
-            }}
-          >
-            {activeWorkspaceName.charAt(0).toUpperCase()}
-          </Avatar>
-          <Box sx={{ overflow: 'hidden' }}>
-            <Typography variant="caption" sx={{ color: '#718096', fontWeight: 700, display: 'block', lineHeight: 1 }}>WORKSPACE</Typography>
-            <Typography variant="subtitle2" sx={{ fontWeight: 800, noWrap: true, color: '#1a202c' }}>
-              {activeWorkspaceName}
-            </Typography>
-          </Box>
-        </ListItemButton>
-      </Box>
+    <>
+      {/* Mobile overlay */}
+      {isOpen && (
+        <div 
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-40 lg:hidden"
+          onClick={onClose}
+        ></div>
+      )}
 
-      <Divider sx={{ mx: 2, mb: 2, opacity: 0.5 }} />
+      {/* Sidebar */}
+      <aside 
+        className={`fixed lg:static inset-y-0 left-0 z-50 w-64 bg-crm-card/90 backdrop-blur-2xl border-r border-crm-border flex flex-col transition-transform duration-300 ease-in-out ${
+          isOpen ? 'translate-x-0' : '-translate-x-full lg:translate-x-0'
+        }`}
+      >
+        <div className="h-16 flex items-center justify-between px-6 border-b border-crm-border">
+          <div className="flex items-center gap-2">
+            <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-crm-primary to-crm-accent flex items-center justify-center shadow-glow">
+              <span className="text-white font-bold text-xl leading-none tracking-tighter">C</span>
+            </div>
+            <span className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-crm-textMuted">
+              AgencyOS
+            </span>
+          </div>
+          <button onClick={onClose} className="lg:hidden text-crm-textMuted hover:text-white">
+            <X size={20} />
+          </button>
+        </div>
 
-      {/* User Quick Profile */}
-      <Box sx={{ px: 2, mb: 3 }}>
-        <Box sx={{ p: 1.5, borderRadius: 3, backgroundColor: '#f7fafc', display: 'flex', alignItems: 'center', gap: 1.5 }}>
-          <Badge overlap="circular" anchorOrigin={{ vertical: 'bottom', horizontal: 'right' }} variant="dot" sx={{ '& .MuiBadge-badge': { backgroundColor: '#48bb78', border: '2px solid white' } }}>
-            <Avatar src={user?.profileImage} sx={{ width: 40, height: 40, borderRadius: 2 }} />
-          </Badge>
-          <Box sx={{ overflow: 'hidden' }}>
-            <Typography variant="subtitle2" sx={{ fontWeight: 700, noWrap: true }}>{user?.name}</Typography>
-            <Typography variant="caption" sx={{ color: '#5a67d8', display: 'block', fontWeight: 800 }}>{user?.role}</Typography>
-          </Box>
-        </Box>
-      </Box>
+        <nav className="flex-1 overflow-y-auto py-4 px-3 space-y-1 custom-scrollbar">
+          <div className="mb-4 px-3">
+            <p className="text-xs font-semibold text-crm-textMuted uppercase tracking-wider">
+              {role} Menu
+            </p>
+          </div>
+          
+          {items.map((item) => {
+            const Icon = item.icon;
+            return (
+              <NavLink
+                key={item.path}
+                to={item.path}
+                end={item.path === '/admin' || item.path === '/member' || item.path === '/client'}
+                onClick={() => window.innerWidth < 1024 && onClose()}
+                className={({ isActive }) => 
+                  `flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group relative ${
+                    isActive 
+                      ? 'bg-crm-primary/10 text-crm-primary font-medium' 
+                      : 'text-crm-text hover:bg-crm-border/30 hover:text-white'
+                  }`
+                }
+              >
+                {({ isActive }) => (
+                  <>
+                    {isActive && (
+                      <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-crm-primary rounded-r-full"></div>
+                    )}
+                    <Icon size={18} className={isActive ? 'text-crm-primary' : 'text-crm-textMuted group-hover:text-white transition-colors'} />
+                    <span>{item.name}</span>
+                  </>
+                )}
+              </NavLink>
+            );
+          })}
+        </nav>
 
-      {/* Navigation List */}
-      <List sx={{ flexGrow: 1, px: 2, overflowY: 'auto' }}>
-        {visibleMenuItems.map((item) => (
-          <ListItem key={item.text} disablePadding sx={{ mb: 0.5 }}>
-            <ListItemButton
-              component={NavLink}
-              to={item.path}
-              sx={{
-                borderRadius: 2.5,
-                py: 1.2,
-                transition: 'all 0.2s',
-                backgroundColor: location.pathname === item.path ? '#ebf4ff' : 'transparent',
-                color: location.pathname === item.path ? '#5a67d8' : '#718096',
-                '&:hover': { backgroundColor: '#f7fafc', color: '#5a67d8' },
-                '& .MuiListItemIcon-root': { color: location.pathname === item.path ? '#5a67d8' : '#718096', minWidth: 40 }
-              }}
-            >
-              <ListItemIcon>{item.icon}</ListItemIcon>
-              <ListItemText primary={item.text} primaryTypographyProps={{ fontWeight: location.pathname === item.path ? 700 : 500, fontSize: '0.9rem' }} />
-            </ListItemButton>
-          </ListItem>
-        ))}
-      </List>
-
-      <Divider sx={{ mx: 2, opacity: 0.5 }} />
-
-      {/* Footer Actions */}
-      <List sx={{ px: 2, py: 2 }}>
-        <ListItem disablePadding>
-          <ListItemButton onClick={logout} sx={{ borderRadius: 2.5, color: '#e53e3e', '&:hover': { backgroundColor: '#fff5f5' } }}>
-            <ListItemIcon sx={{ minWidth: 40, color: '#e53e3e' }}><LogoutOutlinedIcon /></ListItemIcon>
-            <ListItemText primary="Logout" primaryTypographyProps={{ fontWeight: 500, fontSize: '0.9rem' }} />
-          </ListItemButton>
-        </ListItem>
-      </List>
-    </Box>
+        <div className="p-4 border-t border-crm-border">
+          <div className="bg-gradient-to-br from-crm-darker to-crm-card border border-crm-border rounded-xl p-4 relative overflow-hidden">
+            <div className="absolute top-0 right-0 w-16 h-16 bg-crm-primary/20 blur-2xl rounded-full"></div>
+            <p className="text-xs text-crm-textMuted mb-2">Workspace</p>
+            <p className="text-sm font-semibold text-white truncate">Main Agency</p>
+          </div>
+        </div>
+      </aside>
+    </>
   );
 };
-
-export default Sidebar;

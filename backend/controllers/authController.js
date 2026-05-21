@@ -83,13 +83,29 @@ const registerUser = async (req, res) => {
       role: finalRole
     });
 
+    let workspaceIds = [];
+
     if (user) {
+      // If user is Admin, auto-create a default workspace for them
+      if (finalRole === 'Admin') {
+        const Workspace = require('../models/Workspace');
+        const defaultWorkspace = await Workspace.create({
+          name: `${name.split(' ')[0]}'s Agency`,
+          ownerId: user._id
+        });
+        await user.addWorkspace(defaultWorkspace);
+        // Add them as admin
+        await defaultWorkspace.addAdmin(user._id);
+        workspaceIds.push(defaultWorkspace._id);
+      }
+
       res.status(201).json({
         _id: user._id,
         name: user.name,
         email: user.email,
         role: user.role,
         profileImage: user.profileImage,
+        workspaces: workspaceIds,
         token: generateToken(user._id),
       });
     } else {
@@ -256,5 +272,14 @@ const resetPassword = async (req, res) => {
     res.status(500).json({ message: 'Server Error' });
   }
 };
+// @desc    Logout user
+const logoutUser = (req, res) => {
+  // In a real app with token blacklisting, you would add the token to a blacklist here
+  res.cookie('jwt', '', {
+    httpOnly: true,
+    expires: new Date(0),
+  });
+  res.status(200).json({ message: 'Logged out successfully' });
+};
 
-module.exports = { authUser, registerUser, getUserProfile, createClient, getClients, forgotPassword, resetPassword };
+module.exports = { authUser, registerUser, getUserProfile, createClient, getClients, forgotPassword, resetPassword, logoutUser };
