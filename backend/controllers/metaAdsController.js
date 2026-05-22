@@ -338,11 +338,11 @@ const generateMockLeads = async (workspaceId, clientId, res) => {
         await MetaAdsLead.bulkCreate([
             {
               workspaceId, clientId,
-              name: 'Rohan Sharma', email: 'rohan.sharma@example.com', phone: '+91 98765 43210', status: 'new', platform: 'Facebook'
+              name: 'Rohan Sharma', email: 'rohan.sharma@example.com', phone: '+91 98765 43210', status: 'NEW', source: 'Meta Ads', platform: 'Facebook'
             },
             {
               workspaceId, clientId,
-              name: 'Sneha Patel', email: 'sneha.patel@example.com', phone: '+91 99887 76655', status: 'contacted', platform: 'Instagram'
+              name: 'Sneha Patel', email: 'sneha.patel@example.com', phone: '+91 99887 76655', status: 'CONTACTED', source: 'Instagram', platform: 'Instagram'
             }
         ]);
     }

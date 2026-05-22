@@ -115,10 +115,13 @@ const sendMessage = async (req, res) => {
     const io = req.app.get('socketio');
     if (io) {
       const { emitChannelMessage, emitDirectMessage } = require('../utils/socketEmit');
+      const { notifyDirectMessage, notifyChannelMessage } = require('../utils/notifyHelper');
       if (json.isDirectMessage) {
         emitDirectMessage(io, json);
+        await notifyDirectMessage(io, json, json.sender);
       } else if (json.channelId) {
         emitChannelMessage(io, json);
+        await notifyChannelMessage(io, json, json.sender);
       }
     }
 

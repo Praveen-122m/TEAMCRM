@@ -27,7 +27,6 @@ export const Sidebar = ({ isOpen, onClose }) => {
       { name: 'Dashboard', path: '/admin', icon: LayoutDashboard },
       { name: 'Office Workspaces', path: '/admin/office-workspaces', icon: Building },
       { name: 'Client Workspaces', path: '/admin/client-workspaces', icon: Briefcase },
-      { name: 'Team Chat', path: '/channels', icon: MessageSquare },
       { name: 'Clients', path: '/admin/clients', icon: Users },
       { name: 'Team Members', path: '/admin/members', icon: UserSquare2 },
       { name: 'Meta Ads', path: '/meta-ads', icon: Megaphone },

@@ -159,21 +159,60 @@ const updateClient = async (req, res) => {
     const client = await Client.findByPk(req.params.id);
     if (!client) return res.status(404).json({ message: 'Client not found' });
 
-    const { companyName, industry, contactPerson, phone, address, website, monthlyBudget, status, notes } = req.body;
-    
+    const {
+      name,
+      email,
+      password,
+      companyName,
+      industry,
+      contactPerson,
+      phone,
+      address,
+      website,
+      monthlyBudget,
+      status,
+      notes,
+    } = req.body;
+
     await client.update({
       ...(companyName !== undefined && { companyName }),
       ...(industry !== undefined && { industry }),
-      ...(contactPerson !== undefined && { contactPerson }),
+      ...(contactPerson !== undefined && { contactPerson: contactPerson || name }),
+      ...(name !== undefined && { contactPerson: name }),
       ...(phone !== undefined && { phone }),
       ...(address !== undefined && { address }),
       ...(website !== undefined && { website }),
       ...(monthlyBudget !== undefined && { monthlyBudget }),
       ...(status !== undefined && { status }),
       ...(notes !== undefined && { notes }),
+      ...(email !== undefined && { email }),
     });
 
-    res.json(client);
+    const user = await User.findByPk(client.userId);
+    if (user) {
+      if (name) user.name = name;
+      if (email) user.email = email;
+      if (password) {
+        const passwordCheck = validatePasswordStrength(password);
+        if (!passwordCheck.isValid) {
+          return res.status(400).json({ message: passwordCheck.message });
+        }
+        user.password = password;
+      }
+      await user.save();
+    }
+
+    res.json({
+      _id: client._id,
+      userId: client.userId,
+      name: user?.name,
+      email: user?.email || client.email,
+      companyName: client.companyName,
+      industry: client.industry,
+      phone: client.phone,
+      monthlyBudget: client.monthlyBudget,
+      status: client.status,
+    });
   } catch (error) {
     console.error('[UPDATE_CLIENT_ERR]', error);
     res.status(500).json({ message: 'Server Error' });

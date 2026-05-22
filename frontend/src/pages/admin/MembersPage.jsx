@@ -1,13 +1,15 @@
 import { useState, useEffect } from 'react';
 import { DataTable } from '../../components/DataTable';
 import { Modal } from '../../components/Modal';
-import { Plus, UserSquare2, Mail, Trash2 } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { Plus, UserSquare2, Mail, Trash2, MessageSquare } from 'lucide-react';
 import { useAuth } from '../../hooks/useAuth';
 import { memberService } from '../../services/memberService';
 import toast from 'react-hot-toast';
 
 const MembersPage = () => {
   const { activeWorkspace } = useAuth();
+  const navigate = useNavigate();
   const [members, setMembers] = useState([]);
   const [isModalOpen, setIsModalOpen] = useState(false);
   const [formData, setFormData] = useState({
@@ -89,7 +91,28 @@ const MembersPage = () => {
       sortable: false,
       cell: (row) => (
         <div className="flex items-center gap-2">
-          <button 
+          <button
+            type="button"
+            title="Direct message"
+            className="p-2 rounded hover:bg-crm-primary/20 text-crm-textMuted hover:text-crm-primary transition-colors"
+            onClick={() =>
+              navigate('/messages', {
+                state: {
+                  selectedUser: {
+                    _id: row.userId || row._id,
+                    name: row.name,
+                    email: row.email,
+                    profileImage: row.profileImage,
+                    role: 'Member',
+                  },
+                },
+              })
+            }
+          >
+            <MessageSquare size={16} />
+          </button>
+          <button
+            type="button"
             className="p-2 rounded hover:bg-rose-500/20 text-crm-textMuted hover:text-rose-400 transition-colors"
             onClick={async () => {
               if (window.confirm('Remove this member?')) {

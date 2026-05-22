@@ -6,10 +6,11 @@ import { useNavigate, useLocation } from 'react-router-dom';
 import api from '../services/api';
 import toast from 'react-hot-toast';
 import { resolveMediaUrl, isImageFile, isVideoFile, fileDisplayName } from '../utils/mediaUrl';
+import { downloadMediaFile } from '../utils/downloadFile';
 import CreateChannelModal from '../components/modals/CreateChannelModal';
 
 const ChannelChat = ({ isEmbedded = false, workspaceId: workspaceIdProp, workspaceName }) => {
-  const { user, activeWorkspace } = useAuth();
+  const { user, activeWorkspace, setActiveWorkspace } = useAuth();
   const { socket, isConnected, clearUnread } = useContext(SocketContext);
   const navigate = useNavigate();
   const location = useLocation();
@@ -65,8 +66,19 @@ const ChannelChat = ({ isEmbedded = false, workspaceId: workspaceIdProp, workspa
     }
   }, []);
 
+  useEffect(() => {
+    if (isEmbedded || !user?.workspaces?.length) return;
+    if (!activeWorkspace && !location.state?.workspaceId) {
+      const ws = user.workspaces[0].toString();
+      setActiveWorkspace(ws);
+    }
+  }, [user, activeWorkspace, location.state?.workspaceId, isEmbedded, setActiveWorkspace]);
+
   const fetchData = useCallback(async () => {
-    if (!user || !resolvedWorkspaceId) return;
+    if (!user || !resolvedWorkspaceId) {
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setActiveChannel(null);
     setMessages([]);
@@ -92,7 +104,9 @@ const ChannelChat = ({ isEmbedded = false, workspaceId: workspaceIdProp, workspa
 
       const targetChannelId = location.state?.activeChannelId;
       if (targetChannelId) {
-        const target = chRes.data.find((c) => c._id === targetChannelId);
+        const target = chRes.data.find(
+          (c) => c._id?.toString() === targetChannelId?.toString()
+        );
         if (target) {
           setActiveChannel(target);
           return;
@@ -257,6 +271,7 @@ const ChannelChat = ({ isEmbedded = false, workspaceId: workspaceIdProp, workspa
         fileData = { url: res.data.url, type: res.data.format, name: selectedFile.file.name };
       } catch (err) {
         console.error('Upload failed', err);
+        toast.error(err.response?.data?.message || 'File upload failed');
         setUploading(false);
         return;
       }
@@ -285,6 +300,7 @@ const ChannelChat = ({ isEmbedded = false, workspaceId: workspaceIdProp, workspa
       scrollToBottom();
     } catch (error) {
       console.error('Send Message Error:', error);
+      toast.error(error.response?.data?.message || 'Failed to send message');
     }
   };
 
@@ -307,9 +323,13 @@ const ChannelChat = ({ isEmbedded = false, workspaceId: workspaceIdProp, workspa
       return (
         <div className="mt-2 rounded-xl overflow-hidden border border-crm-border max-w-sm">
           <img src={url} alt={name} className="max-w-full block" />
-          <a href={url} download={name} target="_blank" rel="noopener noreferrer" className="block text-center text-xs py-2 text-crm-primary hover:underline">
+          <button
+            type="button"
+            onClick={() => downloadMediaFile(msg.fileUrl, name)}
+            className="block w-full text-center text-xs py-2 text-crm-primary hover:underline"
+          >
             Download
-          </a>
+          </button>
         </div>
       );
     }
@@ -318,17 +338,25 @@ const ChannelChat = ({ isEmbedded = false, workspaceId: workspaceIdProp, workspa
       return (
         <div className="mt-2 rounded-xl overflow-hidden border border-crm-border max-w-md">
           <video src={url} controls className="w-full max-h-72 block" />
-          <a href={url} download={name} target="_blank" rel="noopener noreferrer" className="flex items-center justify-center gap-1 text-xs py-2 text-crm-primary hover:underline">
+          <button
+            type="button"
+            onClick={() => downloadMediaFile(msg.fileUrl, name)}
+            className="flex items-center justify-center gap-1 w-full text-xs py-2 text-crm-primary hover:underline"
+          >
             <Download size={14} /> Download Video
-          </a>
+          </button>
         </div>
       );
     }
 
     return (
-      <a href={url} download={name} target="_blank" rel="noopener noreferrer" className="mt-2 inline-flex items-center gap-2 text-sm text-crm-primary hover:underline">
+      <button
+        type="button"
+        onClick={() => downloadMediaFile(msg.fileUrl, name)}
+        className="mt-2 inline-flex items-center gap-2 text-sm text-crm-primary hover:underline"
+      >
         <Download size={14} /> {name}
-      </a>
+      </button>
     );
   };
 
@@ -382,9 +410,13 @@ const ChannelChat = ({ isEmbedded = false, workspaceId: workspaceIdProp, workspa
                     <p className="text-[10px] text-crm-textMuted mt-0.5">{file.sender?.name || 'Team member'}</p>
                     <div className="flex justify-between items-center mt-2">
                       <span className="text-[10px] text-crm-textMuted">{new Date(file.createdAt).toLocaleDateString()}</span>
-                      <a href={url} download={name} target="_blank" rel="noopener noreferrer" className="text-crm-primary hover:text-crm-primaryHover">
+                      <button
+                        type="button"
+                        onClick={() => downloadMediaFile(file.fileUrl, name)}
+                        className="text-crm-primary hover:text-crm-primaryHover"
+                      >
                         <Download size={16} />
-                      </a>
+                      </button>
                     </div>
                   </div>
                 </div>
@@ -395,6 +427,14 @@ const ChannelChat = ({ isEmbedded = false, workspaceId: workspaceIdProp, workspa
       </div>
     );
   };
+
+  if (!resolvedWorkspaceId && !loading) {
+    return (
+      <div className="glass-panel p-8 text-center text-crm-textMuted max-w-lg mx-auto">
+        <p>No workspace selected. Open a client workspace or join one from My Workspaces, then open Team Chat again.</p>
+      </div>
+    );
+  }
 
   if (loading) {
     return (

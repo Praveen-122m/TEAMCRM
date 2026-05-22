@@ -8,6 +8,7 @@ import { messageService } from '../services/messageService';
 import { workspaceService } from '../services/workspaceService';
 import api from '../services/api';
 import { resolveMediaUrl, isImageFile, isVideoFile, fileDisplayName } from '../utils/mediaUrl';
+import { downloadMediaFile } from '../utils/downloadFile';
 
 const DirectMessages = () => {
   const { user, activeWorkspace, setActiveWorkspace } = useAuth();
@@ -198,9 +199,9 @@ const DirectMessages = () => {
       return (
         <div className="mt-2 rounded-xl overflow-hidden border border-crm-border max-w-xs">
           <img src={url} alt={name} className="max-w-full" />
-          <a href={url} download={name} className="block text-center text-xs py-2 text-crm-primary hover:underline">
+          <button type="button" onClick={() => downloadMediaFile(msg.fileUrl, name)} className="block w-full text-center text-xs py-2 text-crm-primary hover:underline">
             Download
-          </a>
+          </button>
         </div>
       );
     }
@@ -208,16 +209,16 @@ const DirectMessages = () => {
       return (
         <div className="mt-2 rounded-xl overflow-hidden border border-crm-border max-w-sm">
           <video src={url} controls className="w-full max-h-48" />
-          <a href={url} download={name} className="flex items-center gap-1 text-xs py-2 px-2 text-crm-primary">
+          <button type="button" onClick={() => downloadMediaFile(msg.fileUrl, name)} className="flex items-center gap-1 text-xs py-2 px-2 text-crm-primary">
             <Download size={14} /> Download
-          </a>
+          </button>
         </div>
       );
     }
     return (
-      <a href={url} download={name} className="mt-2 inline-flex items-center gap-2 text-sm text-crm-primary hover:underline">
+      <button type="button" onClick={() => downloadMediaFile(msg.fileUrl, name)} className="mt-2 inline-flex items-center gap-2 text-sm text-crm-primary hover:underline">
         <Download size={14} /> {name}
-      </a>
+      </button>
     );
   };
 
@@ -348,7 +349,7 @@ const DirectMessages = () => {
             )}
 
             <form onSubmit={handleSend} className="p-4 border-t border-crm-border flex gap-2">
-              <input type="file" ref={fileInputRef} className="hidden" onChange={(e) => setSelectedFile(e.target.files[0])} accept="image/*,video/*,.pdf,.doc,.docx" />
+              <input type="file" ref={fileInputRef} className="hidden" onChange={(e) => setSelectedFile(e.target.files[0])} accept="image/*,video/*,.pdf,.doc,.docx,.xls,.xlsx,.ppt,.pptx,.txt,.zip" />
               <button type="button" onClick={() => fileInputRef.current?.click()} className="p-2.5 rounded-xl hover:bg-crm-border text-crm-textMuted" disabled={uploading}>
                 <Paperclip size={20} />
               </button>

@@ -185,7 +185,13 @@ function initAssociations() {
   MetaAdsConnection.belongsTo(Workspace, { foreignKey: 'workspaceId' });
 
   MetaAdsCampaign.hasMany(MetaAdsLead, { foreignKey: 'campaignId', onDelete: 'SET NULL' });
-  MetaAdsLead.belongsTo(MetaAdsCampaign, { foreignKey: 'campaignId' });
+  MetaAdsLead.belongsTo(MetaAdsCampaign, { as: 'campaign', foreignKey: 'campaignId' });
+
+  Client.hasMany(MetaAdsLead, { foreignKey: 'clientId', as: 'leads', onDelete: 'CASCADE' });
+  MetaAdsLead.belongsTo(Client, { as: 'client', foreignKey: 'clientId' });
+
+  Member.hasMany(MetaAdsLead, { foreignKey: 'assignedMemberId', as: 'assignedLeads', onDelete: 'SET NULL' });
+  MetaAdsLead.belongsTo(Member, { as: 'assignedMember', foreignKey: 'assignedMemberId' });
 
   // ══════════════════════════════════════════════════
   // File Associations

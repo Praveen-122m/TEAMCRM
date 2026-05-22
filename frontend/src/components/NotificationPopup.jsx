@@ -1,25 +1,18 @@
 import React, { useContext, useEffect, useState, useRef } from 'react';
-import { Snackbar, Box, Typography, Avatar, IconButton, Paper, Slide } from '@mui/material';
+import { MessageSquare, AtSign, X } from 'lucide-react';
 import { SocketContext } from '../context/SocketContext';
 import { AuthContext } from '../context/AuthContext';
-import CloseIcon from '@mui/icons-material/Close';
-import ChatBubbleOutlineOutlinedIcon from '@mui/icons-material/ChatBubbleOutlineOutlined';
 import { useNavigate, useLocation } from 'react-router-dom';
-
-function TransitionLeft(props) {
-  return <Slide {...props} direction="left" />;
-}
 
 const NotificationPopup = () => {
   const { socket } = useContext(SocketContext);
-  const { user } = useContext(AuthContext);
+  const { user, setActiveWorkspace } = useContext(AuthContext);
   const [open, setOpen] = useState(false);
   const [notification, setNotification] = useState(null);
   const navigate = useNavigate();
   const location = useLocation();
   const locationRef = useRef(location.pathname);
 
-  // Keep ref in sync with current path
   useEffect(() => {
     locationRef.current = location.pathname;
   }, [location.pathname]);
@@ -27,133 +20,111 @@ const NotificationPopup = () => {
   useEffect(() => {
     if (!socket) return;
 
-    const messageListener = (newMessage) => {
-      // Don't show notification if user is already on the relevant chat page
-      const senderId = newMessage.senderId || newMessage.sender?._id || newMessage.sender;
-      const isMe = senderId?.toString() === user?._id?.toString();
-      if (isMe) return;
+    const showPopup = (data) => {
+      const senderId = data.senderId || data.sender?._id;
+      if (senderId?.toString() === user?._id?.toString()) return;
 
-      const isDirectMessage = newMessage.isDirectMessage;
+      const payload = data.payload || {};
       const currentPath = locationRef.current;
-      
-      // Determine if we should skip notification
-      let skip = false;
-      if (isDirectMessage && (currentPath === '/messages' || currentPath === '/dms')) {
-         skip = true; 
-      } else if (
-        !isDirectMessage &&
-        (currentPath === '/channels' ||
-          /\/office-workspaces\/[^/]+$/.test(currentPath) ||
-          /\/client-workspaces\/[^/]+$/.test(currentPath))
-      ) {
-        skip = true;
+      const isDm = data.isDirectMessage || payload.isDirectMessage || data.type === 'dm';
+
+      if (isDm && (currentPath === '/messages' || currentPath === '/dms')) return;
+
+      if (!isDm && currentPath === '/channels') {
+        const activeWs = localStorage.getItem('activeWorkspace');
+        if (payload.workspaceId && activeWs === payload.workspaceId.toString()) return;
       }
 
-      if (!skip) {
-        setNotification(newMessage);
-        setOpen(true);
-        // Play subtle sound
-        const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2354/2354-preview.mp3');
-        audio.play().catch(() => {});
-      }
-    };
-
-    const announcementListener = (newAnnouncement) => {
-      const senderId = newAnnouncement.senderId || newAnnouncement.sender?._id || newAnnouncement.sender;
-      const isMe = senderId?.toString() === user?._id?.toString();
-      if (isMe) return;
-
-      if (locationRef.current === '/announcements') return;
-
-      setNotification({
-        isAnnouncement: true,
-        title: newAnnouncement.title,
-        message: newAnnouncement.message,
-        sender: newAnnouncement.sender
-      });
+      setNotification({ ...data, payload, isDirectMessage: isDm });
       setOpen(true);
       const audio = new Audio('https://assets.mixkit.co/active_storage/sfx/2354/2354-preview.mp3');
       audio.play().catch(() => {});
     };
 
-    socket.on('message_received', messageListener);
-    socket.on('announcement_received', announcementListener);
-    
+    socket.on('message_received', showPopup);
+    socket.on('notification_received', showPopup);
+    socket.on('announcement_received', (ann) => {
+      const senderId = ann.senderId || ann.sender?._id;
+      if (senderId?.toString() === user?._id?.toString()) return;
+      setNotification({ ...ann, isAnnouncement: true });
+      setOpen(true);
+    });
+
     return () => {
-      socket.off('message_received', messageListener);
-      socket.off('announcement_received', announcementListener);
+      socket.off('message_received', showPopup);
+      socket.off('notification_received', showPopup);
+      socket.off('announcement_received');
     };
-  }, [socket, user]);
+  }, [socket, user?._id]);
 
   const handleClose = () => setOpen(false);
 
   const handleClick = () => {
-    if (notification?.isAnnouncement) {
-      navigate('/announcements');
-    } else if (notification?.isDirectMessage) {
-      navigate('/messages', { state: { selectedUser: notification.sender } });
+    const p = notification?.payload || {};
+    if (p.workspaceId) setActiveWorkspace(p.workspaceId.toString());
+
+    if (p.isLead || notification?.type === 'lead') {
+      navigate('/leads');
+    } else if (notification?.isAnnouncement) {
+      navigate('/channels');
+    } else if (notification?.isDirectMessage || p.isDirectMessage) {
+      navigate('/messages', {
+        state: { selectedUser: p.sender || notification.sender },
+      });
     } else {
-      const targetChannelId = notification.channelId || notification.channel?._id || notification.channel;
-      navigate('/channels', { state: { activeChannelId: targetChannelId } });
+      navigate('/channels', {
+        state: {
+          workspaceId: p.workspaceId,
+          activeChannelId: p.channelId || notification.channelId,
+        },
+      });
     }
     setOpen(false);
   };
 
-  if (!notification) return null;
+  if (!open || !notification) return null;
 
   return (
-    <Snackbar
-      open={open}
-      autoHideDuration={5000}
-      onClose={handleClose}
-      anchorOrigin={{ vertical: 'top', horizontal: 'right' }}
-      TransitionComponent={TransitionLeft}
-      sx={{ top: { xs: 20, sm: 40 }, right: { xs: 20, sm: 40 } }}
-    >
-      <Paper
-        elevation={10}
+    <div className="fixed top-20 right-4 z-[100] max-w-sm animate-in slide-in-from-right">
+      <button
+        type="button"
         onClick={handleClick}
-        sx={{
-          p: 2,
-          borderRadius: 4,
-          display: 'flex',
-          alignItems: 'center',
-          gap: 2,
-          minWidth: 300,
-          maxWidth: 400,
-          cursor: 'pointer',
-          border: '1px solid #e2e8f0',
-          background: 'rgba(255, 255, 255, 0.95)',
-          backdropFilter: 'blur(10px)',
-          '&:hover': { transform: 'scale(1.02)', transition: '0.2s' }
-        }}
+        className="w-full glass-panel border border-crm-primary/30 p-4 flex items-start gap-3 text-left hover:border-crm-primary/60 transition-colors shadow-glow"
       >
-        <Avatar src={notification.sender?.profileImage} sx={{ width: 48, height: 48, borderRadius: 2.5 }}>
-          <ChatBubbleOutlineOutlinedIcon />
-        </Avatar>
-        <Box sx={{ flexGrow: 1, overflow: 'hidden' }}>
-          <Typography variant="subtitle2" sx={{ fontWeight: 900, color: '#1a202c' }}>
-            {notification.sender?.name}
-          </Typography>
-          <Typography variant="caption" sx={{ color: '#718096', display: 'block', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }}>
-            {notification.isAnnouncement ? 'New Workspace Update' : (notification.isDirectMessage ? 'Direct Message' : 'Channel Message')}
-          </Typography>
-          <Typography variant="body2" sx={{ 
-            color: '#718096', 
-            fontWeight: 600, 
-            fontSize: '0.8rem',
-            overflow: 'hidden',
-            textOverflow: 'ellipsis',
-            whiteSpace: 'nowrap'
-          }}>
+        <div className="w-10 h-10 rounded-xl bg-crm-primary/20 flex items-center justify-center shrink-0">
+          {notification.type === 'mention' ? (
+            <AtSign size={18} className="text-amber-400" />
+          ) : (
+            <MessageSquare size={18} className="text-crm-primary" />
+          )}
+        </div>
+        <div className="min-w-0 flex-1">
+          <p className="text-sm font-bold text-white">{notification.sender?.name || 'New activity'}</p>
+          <p className="text-[10px] text-crm-textMuted uppercase mt-0.5">
+            {notification.isAnnouncement
+              ? 'Announcement'
+              : notification.isDirectMessage
+                ? 'Direct message'
+                : notification.type === 'mention'
+                  ? 'Mention'
+                  : 'Channel message'}
+          </p>
+          <p className="text-xs text-crm-text mt-1 line-clamp-2">
             {notification.isAnnouncement ? notification.title : notification.content}
-          </Typography>
-        </Box>
-        <IconButton size="small" onClick={(e) => { e.stopPropagation(); handleClose(); }}>
-          <CloseIcon fontSize="small" />
-        </IconButton>
-      </Paper>
-    </Snackbar>
+          </p>
+        </div>
+        <button
+          type="button"
+          onClick={(e) => {
+            e.stopPropagation();
+            handleClose();
+          }}
+          className="text-crm-textMuted hover:text-white p-1"
+        >
+          <X size={16} />
+        </button>
+      </button>
+    </div>
   );
 };
 

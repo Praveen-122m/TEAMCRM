@@ -9,7 +9,11 @@ const MetaAdsCampaign = sequelize.define('MetaAdsCampaign', {
   },
   workspaceId: {
     type: DataTypes.UUID,
-    allowNull: false
+    allowNull: false,
+  },
+  clientId: {
+    type: DataTypes.UUID,
+    allowNull: true,
   },
   name: {
     type: DataTypes.STRING,

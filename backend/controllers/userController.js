@@ -63,9 +63,15 @@ const updateProfile = async (req, res) => {
     if (phoneNumber !== undefined) user.phoneNumber = phoneNumber;
 
     await user.save();
-    res.json(user);
+    const fresh = await User.findByPk(req.user._id, {
+      attributes: { exclude: ['password'] },
+    });
+    res.json(fresh);
   } catch (error) {
     console.error('[UPDATE_PROFILE_ERR]', error);
+    if (error.name === 'SequelizeUniqueConstraintError') {
+      return res.status(400).json({ message: 'Email already in use' });
+    }
     res.status(500).json({ message: 'Server Error', error: error.message });
   }
 };

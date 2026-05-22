@@ -1,11 +1,14 @@
-/** Resolve relative upload paths to a fetchable URL (dev proxy or API host). */
+/** Resolve relative upload paths to a fetchable URL (uses Vite proxy in dev). */
 export const resolveMediaUrl = (url) => {
   if (!url) return '';
   if (url.startsWith('http://') || url.startsWith('https://')) return url;
+  if (typeof window !== 'undefined') {
+    return `${window.location.origin}${url.startsWith('/') ? url : `/${url}`}`;
+  }
   const apiBase = import.meta.env.VITE_API_URL || '';
   const origin = apiBase
     ? apiBase.replace(/\/api\/?$/, '')
-    : `${window.location.protocol}//${window.location.hostname}:5005`;
+    : 'http://localhost:5005';
   return `${origin}${url.startsWith('/') ? url : `/${url}`}`;
 };
 
@@ -19,6 +22,13 @@ export const isVideoFile = (fileType, url) => {
   const t = (fileType || '').toLowerCase();
   if (t.includes('video')) return true;
   return /\.(mp4|mov|avi|wmv|webm|mkv)$/i.test(url || '');
+};
+
+export const isDocumentFile = (fileType, url) => {
+  if (isImageFile(fileType, url) || isVideoFile(fileType, url)) return false;
+  const t = (fileType || '').toLowerCase();
+  if (t.includes('document') || t.includes('spreadsheet') || t.includes('archive')) return true;
+  return /\.(pdf|docx?|xlsx?|xls|pptx?|ppt|txt|csv|zip|rar|7z)$/i.test(url || '');
 };
 
 export const fileDisplayName = (msg) => {

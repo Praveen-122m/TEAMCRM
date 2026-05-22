@@ -95,7 +95,12 @@ export const AuthProvider = ({ children }) => {
   const refreshUser = async () => {
     try {
       const { data } = await api.get('/auth/profile');
-      const updatedUser = { ...user, ...data };
+      const updatedUser = {
+        ...user,
+        ...data,
+        workspaces: data.workspaces ?? user?.workspaces,
+        workspacesMeta: data.workspacesMeta ?? user?.workspacesMeta,
+      };
       setUser(updatedUser);
       localStorage.setItem('userInfo', JSON.stringify(updatedUser));
       return { success: true, data: updatedUser };

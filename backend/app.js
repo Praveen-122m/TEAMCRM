@@ -60,6 +60,7 @@ app.use('/api/members', require('./routes/memberRoutes'));
 app.use('/api/campaigns', require('./routes/campaignRoutes'));
 app.use('/api/leads', require('./routes/leadRoutes'));
 app.use('/api/files', require('./routes/fileRoutes'));
+app.use('/api/notifications', require('./routes/notificationRoutes'));
 app.use('/api/reports', require('./routes/reportRoutes'));
 
 // ── Error Handler ──

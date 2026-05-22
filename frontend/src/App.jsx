@@ -25,7 +25,7 @@ import ClientDashboard from './pages/ClientDashboard';
 // Shared Pages
 import MetaAdsDashboard from './pages/MetaAdsDashboard';
 import MetaAdsCampaigns from './pages/MetaAdsCampaigns';
-import MetaAdsLeads from './pages/MetaAdsLeads';
+import LeadCenter from './pages/LeadCenter';
 import FileManager from './pages/FileManager';
 import DirectMessages from './pages/DirectMessages';
 import Settings from './pages/Settings';
@@ -84,7 +84,7 @@ const App = () => {
       <Route element={<Layout allowedRoles={['Admin', 'Member', 'Client']} />}>
         <Route path="/meta-ads" element={<MetaAdsDashboard />} />
         <Route path="/meta-ads/campaigns" element={<MetaAdsCampaigns />} />
-        <Route path="/leads" element={<MetaAdsLeads />} />
+        <Route path="/leads" element={<LeadCenter />} />
         <Route path="/files" element={<FileManager />} />
         <Route path="/messages" element={<DirectMessages />} />
         <Route path="/dms" element={<Navigate to="/messages" replace />} />

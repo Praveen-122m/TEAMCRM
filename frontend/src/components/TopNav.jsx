@@ -1,14 +1,15 @@
-import { useState, useContext } from 'react';
-import { Bell, Search, Settings, LogOut, Menu } from 'lucide-react';
+import { useState } from 'react';
+import { Search, Settings, LogOut, Menu } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
-import { SocketContext } from '../context/SocketContext';
+import { resolveMediaUrl } from '../utils/mediaUrl';
+import NotificationBell from './NotificationBell';
 
 export const TopNav = ({ onMenuClick }) => {
   const { user, logout } = useAuth();
   const navigate = useNavigate();
-  const { totalUnread } = useContext(SocketContext) || { totalUnread: 0 };
   const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const avatarUrl = user?.profileImage ? resolveMediaUrl(user.profileImage) : null;
 
   return (
     <header className="h-16 border-b border-crm-border bg-crm-card/50 backdrop-blur-md sticky top-0 z-40 flex items-center justify-between px-4 lg:px-8">
@@ -31,19 +32,7 @@ export const TopNav = ({ onMenuClick }) => {
       </div>
 
       <div className="flex items-center gap-4">
-        <button
-          type="button"
-          onClick={() => navigate('/messages')}
-          className="relative p-2 text-crm-textMuted hover:text-white transition-colors"
-          title="Notifications & messages"
-        >
-          <Bell size={20} />
-          {totalUnread > 0 && (
-            <span className="absolute -top-0.5 -right-0.5 min-w-[18px] h-[18px] px-1 bg-rose-500 text-white text-[10px] font-bold rounded-full flex items-center justify-center">
-              {totalUnread > 9 ? '9+' : totalUnread}
-            </span>
-          )}
-        </button>
+        <NotificationBell />
 
         <div className="relative">
           <button
@@ -54,9 +43,13 @@ export const TopNav = ({ onMenuClick }) => {
               <span className="text-sm font-medium text-white">{user?.name || 'User'}</span>
               <span className="text-xs text-crm-textMuted">{user?.role || 'Guest'}</span>
             </div>
-            <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-crm-primary to-crm-accent flex items-center justify-center text-white font-bold text-sm">
-              {user?.name?.charAt(0) || 'U'}
-            </div>
+            {avatarUrl ? (
+              <img src={avatarUrl} alt="" className="w-8 h-8 rounded-full object-cover border border-crm-border" />
+            ) : (
+              <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-crm-primary to-crm-accent flex items-center justify-center text-white font-bold text-sm">
+                {user?.name?.charAt(0) || 'U'}
+              </div>
+            )}
           </button>
 
           {showProfileMenu && (
