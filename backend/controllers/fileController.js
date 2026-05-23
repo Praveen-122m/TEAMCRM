@@ -93,7 +93,7 @@ const deleteFile = async (req, res) => {
     if (!file) return res.status(404).json({ message: 'File not found' });
 
     // Only uploader or admin can delete
-    if (file.uploadedById !== req.user._id && req.user.role !== 'Admin') {
+    if (file.uploadedById.toString() !== req.user._id.toString() && req.user.role !== 'Admin') {
       return res.status(403).json({ message: 'Not authorized to delete this file' });
     }
 

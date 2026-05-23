@@ -15,28 +15,25 @@ const MetaClientNav = ({ clients, selectedClient, onSelect, loading }) => {
   }
 
   return (
-    <div className="glass-panel p-4 mb-6 border border-crm-border/80 sticky top-16 z-20">
-      <p className="text-[10px] font-bold uppercase tracking-wider text-crm-textMuted mb-3">
-        Select client — Meta Ads dashboard
-      </p>
-      <div className="flex flex-wrap gap-2">
-        {clients.map((client) => {
-          const active = selectedClient === client._id;
-          return (
-            <button
-              key={client._id}
-              type="button"
-              onClick={() => onSelect(client._id)}
-              className={`px-4 py-2.5 rounded-full text-sm font-semibold transition-all border ${
-                active
-                  ? 'bg-crm-primary text-white border-crm-primary shadow-glow scale-[1.02]'
-                  : 'bg-crm-darker/70 border-crm-border text-crm-textMuted hover:text-white hover:border-crm-primary/50'
-              }`}
-            >
+    <div className="glass-panel p-4 mb-6 border border-crm-border/80 sticky top-16 z-20 flex items-center justify-between">
+      <div className="flex flex-col">
+        <p className="text-[10px] font-bold uppercase tracking-wider text-crm-textMuted mb-1">
+          Select client — Meta Ads dashboard
+        </p>
+        <p className="text-sm text-crm-text">View analytics for a specific client</p>
+      </div>
+      <div className="min-w-[250px]">
+        <select
+          value={selectedClient}
+          onChange={(e) => onSelect(e.target.value)}
+          className="glass-input w-full cursor-pointer bg-crm-darker/90 border-crm-primary/30 focus:border-crm-primary text-white font-medium"
+        >
+          {clients.map((client) => (
+            <option key={client._id} value={client._id} className="bg-crm-darker text-white">
               {client.companyName || client.name}
-            </button>
-          );
-        })}
+            </option>
+          ))}
+        </select>
       </div>
     </div>
   );

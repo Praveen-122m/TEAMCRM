@@ -20,6 +20,11 @@ const MetaAdsLead = require('./MetaAdsLead');
 const File = require('./File');
 const Report = require('./Report');
 
+// SaaS Models
+const SaaSClient = require('./SaaSClient');
+const SaaSMetaAccount = require('./SaaSMetaAccount');
+const SaaSMetaAdsInsight = require('./SaaSMetaAdsInsight');
+
 function initAssociations() {
   console.log('[DB] Initializing database model associations...');
 
@@ -216,6 +221,15 @@ function initAssociations() {
 
   Client.hasMany(Report, { foreignKey: 'clientId', as: 'reports', onDelete: 'SET NULL' });
   Report.belongsTo(Client, { foreignKey: 'clientId', as: 'reportClient' });
+
+  // ══════════════════════════════════════════════════
+  // SaaS Multi-Client Meta Ads Associations
+  // ══════════════════════════════════════════════════
+  SaaSClient.hasOne(SaaSMetaAccount, { foreignKey: 'client_id', as: 'metaAccount', onDelete: 'CASCADE' });
+  SaaSMetaAccount.belongsTo(SaaSClient, { foreignKey: 'client_id', as: 'client' });
+
+  SaaSClient.hasMany(SaaSMetaAdsInsight, { foreignKey: 'client_id', as: 'insights', onDelete: 'CASCADE' });
+  SaaSMetaAdsInsight.belongsTo(SaaSClient, { foreignKey: 'client_id', as: 'client' });
 }
 
 module.exports = initAssociations;

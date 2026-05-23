@@ -11,9 +11,9 @@ const sequelize = new Sequelize(
     dialect: 'mysql',
     logging: false,
     pool: {
-      max: 10,
+      max: 50,
       min: 0,
-      acquire: 30000,
+      acquire: 60000,
       idle: 10000
     }
   }
@@ -35,8 +35,8 @@ const connectDB = async () => {
     // Sync Workspace table to ensure 'type' field is created
     try {
       const Workspace = require('../models/Workspace');
-      await Workspace.sync({ alter: true });
-      console.log('[DB] Workspace table altered/synced successfully.');
+      // await Workspace.sync({ alter: true });
+      console.log('[DB] Workspace table synced successfully.');
     } catch (e) {
       console.error('[DB] Workspace sync failed:', e.message);
     }
@@ -46,9 +46,9 @@ const connectDB = async () => {
       const MetaAdsCampaign = require('../models/MetaAdsCampaign');
       const MetaAdsConnection = require('../models/MetaAdsConnection');
       const MetaAdsLead = require('../models/MetaAdsLead');
-      await MetaAdsCampaign.sync({ alter: true });
-      await MetaAdsConnection.sync({ alter: true });
-      await MetaAdsLead.sync({ alter: true });
+      // await MetaAdsCampaign.sync({ alter: true });
+      // await MetaAdsConnection.sync({ alter: true });
+      // await MetaAdsLead.sync({ alter: true });
     } catch (e) {
       console.log('Meta ads sync skipped', e.message);
     }
@@ -56,7 +56,7 @@ const connectDB = async () => {
     // Sync Client table
     try {
       const Client = require('../models/Client');
-      await Client.sync({ alter: true });
+      // await Client.sync({ alter: true });
       console.log('[DB] Clients table synced successfully.');
     } catch (e) {
       console.log('[DB] Client sync skipped:', e.message);

@@ -27,6 +27,8 @@ const ClientWorkspaces = () => {
   const [clientEmail, setClientEmail] = useState('');
   const [clientPassword, setClientPassword] = useState('');
   const [secretCode, setSecretCode] = useState('');
+  const [adAccountId, setAdAccountId] = useState('');
+  const [accessToken, setAccessToken] = useState('');
   const [creating, setCreating] = useState(false);
   const [copiedId, setCopiedId] = useState(null);
   const [credentials, setCredentials] = useState(null);
@@ -58,7 +60,10 @@ const ClientWorkspaces = () => {
 
   const handleCreateWorkspace = async (e) => {
     e.preventDefault();
-    if (!name.trim() || !clientName.trim() || !clientEmail.trim() || !clientPassword) return;
+    if (!name.trim() || !clientName.trim() || !clientEmail.trim() || !clientPassword || !adAccountId.trim() || !accessToken.trim()) {
+      toast.error('Please fill in all required fields');
+      return;
+    }
 
     setCreating(true);
     try {
@@ -70,15 +75,23 @@ const ClientWorkspaces = () => {
         password: clientPassword,
         secretCode: secretCode.trim() || undefined,
         companyName: name.trim(),
+        adAccountId: adAccountId.trim(),
+        accessToken: accessToken.trim()
       });
       setCredentials(res.data.clientCredentials);
-      toast.success('Client workspace & login created!');
+      if (res.data.syncError) {
+        toast.error('Workspace created, but initial Meta Ads sync failed: ' + res.data.syncError, { duration: 6000 });
+      } else {
+        toast.success('Client workspace created and Meta Ads integrated!');
+      }
       setName('');
       setDescription('');
       setClientName('');
       setClientEmail('');
       setClientPassword('');
       setSecretCode('');
+      setAdAccountId('');
+      setAccessToken('');
       setCreateOpen(false);
       await refreshUser();
       fetchWorkspaces();
@@ -92,7 +105,7 @@ const ClientWorkspaces = () => {
 
   const copyCredentials = () => {
     if (!credentials) return;
-    const text = `Client Portal Login\nEmail: ${credentials.email}\nSecret Key: ${credentials.secretCode}\nPassword: ${credentials.password}\nMember Invite Code: ${credentials.inviteCode}`;
+    const text = `Client Portal Login\nEmail: ${credentials.email}\nSecret Key: ${credentials.secretCode}\nPassword: ${credentials.password}\nClient ID: ${credentials.clientId}\nWorkspace ID: ${credentials.workspaceId}`;
     navigator.clipboard.writeText(text);
     toast.success('Login details copied for client!');
   };
@@ -213,25 +226,50 @@ const ClientWorkspaces = () => {
                   </p>
                 </div>
 
-                {/* Invite Code Row */}
-                <div className="p-3 bg-crm-darker/50 border border-crm-border rounded-xl flex items-center justify-between">
-                  <div>
-                    <p className="text-[10px] text-crm-textMuted uppercase tracking-wider font-semibold">
-                      Client Invite Code
-                    </p>
-                    <p className="text-sm font-mono font-bold text-white tracking-wider">
-                      {ws.inviteCode || 'N/A'}
-                    </p>
+                {/* Codes Row */}
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="p-3 bg-crm-darker/50 border border-crm-border rounded-xl flex items-center justify-between">
+                    <div className="overflow-hidden">
+                      <p className="text-[10px] text-crm-textMuted uppercase tracking-wider font-semibold truncate">
+                        Invite Code
+                      </p>
+                      <p className="text-sm font-mono font-bold text-white tracking-wider truncate">
+                        {ws.inviteCode || 'N/A'}
+                      </p>
+                    </div>
+                    {ws.inviteCode && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); copyToClipboard(ws.inviteCode, `inv_${ws._id}`); }}
+                        className="p-1.5 hover:bg-crm-border rounded text-crm-textMuted hover:text-white transition-colors shrink-0"
+                        title="Copy Invite Code"
+                      >
+                        {copiedId === `inv_${ws._id}` ? <Check size={16} className="text-emerald-400" /> : <Copy size={16} />}
+                      </button>
+                    )}
                   </div>
-                  {ws.inviteCode && (
-                    <button
-                      onClick={() => copyToClipboard(ws.inviteCode, ws._id)}
-                      className="p-1.5 hover:bg-crm-border rounded text-crm-textMuted hover:text-white transition-colors"
-                      title="Copy Invite Code"
-                    >
-                      {copiedId === ws._id ? <Check size={16} className="text-emerald-400" /> : <Copy size={16} />}
-                    </button>
-                  )}
+
+                  <div className="p-3 bg-crm-darker/50 border border-crm-border rounded-xl flex items-center justify-between">
+                    <div className="overflow-hidden">
+                      <p className="text-[10px] text-crm-textMuted uppercase tracking-wider font-semibold truncate">
+                        Secret Key
+                      </p>
+                      <p className="text-sm font-mono font-bold text-emerald-400 tracking-wider truncate">
+                        {ws.members?.find(m => m.role === 'Client')?.secretCode || 'N/A'}
+                      </p>
+                    </div>
+                    {ws.members?.find(m => m.role === 'Client')?.secretCode && (
+                      <button
+                        onClick={(e) => { 
+                          e.stopPropagation(); 
+                          copyToClipboard(ws.members.find(m => m.role === 'Client').secretCode, `sec_${ws._id}`); 
+                        }}
+                        className="p-1.5 hover:bg-crm-border rounded text-crm-textMuted hover:text-white transition-colors shrink-0"
+                        title="Copy Secret Key"
+                      >
+                        {copiedId === `sec_${ws._id}` ? <Check size={16} className="text-emerald-400" /> : <Copy size={16} />}
+                      </button>
+                    )}
+                  </div>
                 </div>
               </div>
 
@@ -257,7 +295,7 @@ const ClientWorkspaces = () => {
       {/* Create Modal Dialog */}
       {createOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm transition-all duration-300">
-          <div className="glass-panel w-full max-w-md p-6 space-y-6 border border-crm-border relative animate-in fade-in zoom-in-95 duration-200">
+          <div className="glass-panel w-full max-w-lg p-6 space-y-5 border border-crm-border relative animate-in fade-in zoom-in-95 duration-200">
             {/* Close Button */}
             <button 
               onClick={() => setCreateOpen(false)}
@@ -269,42 +307,68 @@ const ClientWorkspaces = () => {
             {/* Title */}
             <div>
               <h2 className="text-xl font-bold text-white">Create Client Workspace</h2>
-              <p className="text-sm text-crm-textMuted mt-1">
-                Create a secure space for your client where they can log in, chat with your team, and download reports.
+              <p className="text-xs text-crm-textMuted mt-1">
+                Configure a client profile, link their Meta Ads account, and deploy a secure dashboard workspace.
               </p>
             </div>
 
             {/* Form */}
-            <form onSubmit={handleCreateWorkspace} className="space-y-4 max-h-[70vh] overflow-y-auto custom-scrollbar pr-1">
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-crm-textMuted uppercase tracking-wider">Workspace / Company Name</label>
-                <input type="text" placeholder="e.g. Stark Industries" value={name} onChange={(e) => setName(e.target.value)} required className="w-full bg-crm-darker/60 border border-crm-border text-white rounded-xl px-4 py-3 text-sm focus:border-crm-primary focus:outline-none" />
+            <form onSubmit={handleCreateWorkspace} className="space-y-4 max-h-[68vh] overflow-y-auto custom-scrollbar pr-1">
+              
+              {/* SECTION 1 - CLIENT DETAILS */}
+              <div className="space-y-3 pb-3 border-b border-crm-border/40">
+                <h3 className="text-xs font-bold text-violet-400 uppercase tracking-widest">Section 1 – Client Details</h3>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-crm-textMuted">Company Name</label>
+                    <input type="text" placeholder="Stark Industries" value={name} onChange={(e) => setName(e.target.value)} required className="w-full bg-crm-darker/60 border border-crm-border text-white rounded-xl px-4 py-2.5 text-sm focus:border-crm-primary focus:outline-none" />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-crm-textMuted">Client Contact Name</label>
+                    <input type="text" placeholder="John Stark" value={clientName} onChange={(e) => setClientName(e.target.value)} required className="w-full bg-crm-darker/60 border border-crm-border text-white rounded-xl px-4 py-2.5 text-sm focus:border-crm-primary focus:outline-none" />
+                  </div>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-crm-textMuted">Client Email</label>
+                    <input type="email" placeholder="client@company.com" value={clientEmail} onChange={(e) => setClientEmail(e.target.value)} required className="w-full bg-crm-darker/60 border border-crm-border text-white rounded-xl px-4 py-2.5 text-sm focus:border-crm-primary focus:outline-none" />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-crm-textMuted">Password</label>
+                    <input type="text" placeholder="Min 8 chars password" value={clientPassword} onChange={(e) => setClientPassword(e.target.value)} required className="w-full bg-crm-darker/60 border border-crm-border text-white rounded-xl px-4 py-2.5 text-sm focus:border-crm-primary focus:outline-none" />
+                  </div>
+                </div>
+                <div className="space-y-1">
+                  <label className="text-xs font-semibold text-crm-textMuted">Description (Optional)</label>
+                  <textarea placeholder="Describe the client workspace or project scope..." value={description} onChange={(e) => setDescription(e.target.value)} rows={2} className="w-full bg-crm-darker/60 border border-crm-border text-white rounded-xl px-4 py-2.5 text-sm focus:border-crm-primary focus:outline-none resize-none" />
+                </div>
               </div>
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-crm-textMuted uppercase tracking-wider">Description (Optional)</label>
-                <textarea placeholder="Project scope..." value={description} onChange={(e) => setDescription(e.target.value)} rows={2} className="w-full bg-crm-darker/60 border border-crm-border text-white rounded-xl px-4 py-3 text-sm focus:border-crm-primary focus:outline-none resize-none" />
+
+              {/* SECTION 2 - META ADS INTEGRATION */}
+              <div className="space-y-3 pb-3 border-b border-crm-border/40">
+                <h3 className="text-xs font-bold text-violet-400 uppercase tracking-widest">Section 2 – Meta Ads Integration</h3>
+                <div className="space-y-3">
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-crm-textMuted">Meta Ad Account ID</label>
+                    <input type="text" placeholder="e.g. act_123456789" value={adAccountId} onChange={(e) => setAdAccountId(e.target.value)} required className="w-full bg-crm-darker/60 border border-crm-border text-white rounded-xl px-4 py-2.5 text-sm font-mono focus:border-crm-primary focus:outline-none" />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-semibold text-crm-textMuted">Meta Access Token</label>
+                    <input type="text" placeholder="e.g. EAABCD123456TOKEN..." value={accessToken} onChange={(e) => setAccessToken(e.target.value)} required className="w-full bg-crm-darker/60 border border-crm-border text-white rounded-xl px-4 py-2.5 text-sm font-mono focus:border-crm-primary focus:outline-none" />
+                  </div>
+                </div>
               </div>
-              <p className="text-xs text-violet-300 font-semibold border-t border-crm-border pt-3">Client login (share with client)</p>
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-crm-textMuted uppercase tracking-wider">Client Contact Name</label>
-                <input type="text" placeholder="John Stark" value={clientName} onChange={(e) => setClientName(e.target.value)} required className="w-full bg-crm-darker/60 border border-crm-border text-white rounded-xl px-4 py-3 text-sm focus:border-crm-primary focus:outline-none" />
+
+              {/* SECTION 3 - OPTIONAL CONFIG (AUTO GENERATED IF EMPTY) */}
+              <div className="space-y-1 py-1">
+                <label className="text-xs font-semibold text-crm-textMuted">Secret Key (Optional — Auto-generated if blank)</label>
+                <input type="text" placeholder="CL-XXXXXX" value={secretCode} onChange={(e) => setSecretCode(e.target.value.toUpperCase())} className="w-full bg-crm-darker/60 border border-crm-border text-white rounded-xl px-4 py-2.5 text-sm font-mono focus:border-crm-primary focus:outline-none" />
               </div>
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-crm-textMuted uppercase tracking-wider">Client Email</label>
-                <input type="email" placeholder="client@company.com" value={clientEmail} onChange={(e) => setClientEmail(e.target.value)} required className="w-full bg-crm-darker/60 border border-crm-border text-white rounded-xl px-4 py-3 text-sm focus:border-crm-primary focus:outline-none" />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-crm-textMuted uppercase tracking-wider">Client Password</label>
-                <input type="text" placeholder="Min 8 characters" value={clientPassword} onChange={(e) => setClientPassword(e.target.value)} required className="w-full bg-crm-darker/60 border border-crm-border text-white rounded-xl px-4 py-3 text-sm focus:border-crm-primary focus:outline-none" />
-              </div>
-              <div className="space-y-1.5">
-                <label className="text-xs font-semibold text-crm-textMuted uppercase tracking-wider">Secret Key (optional — auto-generated)</label>
-                <input type="text" placeholder="CL-XXXXXX" value={secretCode} onChange={(e) => setSecretCode(e.target.value.toUpperCase())} className="w-full bg-crm-darker/60 border border-crm-border text-white rounded-xl px-4 py-3 text-sm font-mono focus:border-crm-primary focus:outline-none" />
-              </div>
+
               <div className="flex justify-end gap-3 pt-2">
                 <button type="button" onClick={() => setCreateOpen(false)} className="px-4 py-2 rounded-lg text-sm text-crm-textMuted hover:text-white">Cancel</button>
-                <button type="submit" disabled={creating || !name.trim() || !clientName.trim() || !clientEmail || !clientPassword} className="px-5 py-2 bg-violet-600 hover:bg-violet-700 text-white rounded-lg text-sm font-semibold disabled:opacity-50">
-                  {creating ? 'Creating...' : 'Create Workspace + Client'}
+                <button type="submit" disabled={creating} className="px-5 py-2.5 bg-violet-600 hover:bg-violet-700 text-white rounded-xl text-sm font-semibold disabled:opacity-50 transition-colors">
+                  {creating ? 'Integrating & Syncing...' : 'Create Workspace & Integrations'}
                 </button>
               </div>
             </form>
@@ -312,19 +376,23 @@ const ClientWorkspaces = () => {
         </div>
       )}
 
+      {/* Credentials Modal Popup */}
       {credentials && (
         <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm">
           <div className="glass-panel w-full max-w-md p-6 space-y-4 border border-emerald-500/30">
-            <h2 className="text-xl font-bold text-white">Client Login Details</h2>
-            <p className="text-sm text-crm-textMuted">Copy and send these to your client. They login with <strong>Secret Key + Password</strong>.</p>
+            <h2 className="text-xl font-bold text-white">Workspace Configuration Complete</h2>
+            <p className="text-sm text-crm-textMuted">
+              Workspace & client details generated successfully. Copy details to client.
+            </p>
             <div className="space-y-2 text-sm font-mono bg-crm-darker/60 p-4 rounded-xl border border-crm-border">
+              <p><span className="text-crm-textMuted">Client ID:</span> <span className="text-white select-all">{credentials.clientId}</span></p>
+              <p><span className="text-crm-textMuted">Workspace ID:</span> <span className="text-white select-all">{credentials.workspaceId}</span></p>
+              <p><span className="text-crm-textMuted">Secret Key:</span> <span className="text-emerald-400 select-all">{credentials.secretCode}</span></p>
               <p><span className="text-crm-textMuted">Email:</span> <span className="text-white">{credentials.email}</span></p>
-              <p><span className="text-crm-textMuted">Secret Key:</span> <span className="text-emerald-400">{credentials.secretCode}</span></p>
               <p><span className="text-crm-textMuted">Password:</span> <span className="text-white">{credentials.password}</span></p>
-              <p><span className="text-crm-textMuted">Member Invite:</span> <span className="text-white">{credentials.inviteCode}</span></p>
             </div>
             <div className="flex gap-3 justify-end">
-              <button type="button" onClick={copyCredentials} className="glass-button text-sm">Copy All</button>
+              <button type="button" onClick={copyCredentials} className="glass-button text-sm">Copy Details</button>
               <button type="button" onClick={() => setCredentials(null)} className="px-4 py-2 bg-crm-primary text-white rounded-lg text-sm font-semibold">Done</button>
             </div>
           </div>

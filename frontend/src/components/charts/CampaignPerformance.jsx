@@ -23,7 +23,7 @@ export const CampaignPerformance = ({ data = defaultData }) => {
   return (
     <div className="glass-panel p-6 h-96">
       <div className="mb-6">
-        <h3 className="text-lg font-semibold text-white">Campaign Performance</h3>
+        <h3 className="text-lg font-semibold text-crm-text">Campaign Performance</h3>
         <p className="text-sm text-crm-textMuted">Spend vs Conversions by Campaign</p>
       </div>
       

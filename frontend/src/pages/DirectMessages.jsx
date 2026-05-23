@@ -12,7 +12,7 @@ import { downloadMediaFile } from '../utils/downloadFile';
 
 const DirectMessages = () => {
   const { user, activeWorkspace, setActiveWorkspace } = useAuth();
-  const { socket, isConnected, clearUnread } = useContext(SocketContext);
+  const { socket, isConnected, clearUnread, onlineUsers = [] } = useContext(SocketContext);
   const location = useLocation();
 
   const [members, setMembers] = useState([]);
@@ -275,8 +275,13 @@ const DirectMessages = () => {
                     : 'hover:bg-crm-border/30'
                 }`}
               >
-                <div className="w-9 h-9 rounded-full bg-crm-primary/20 flex items-center justify-center text-crm-primary font-bold text-sm">
-                  {m.name?.charAt(0)}
+                <div className="relative shrink-0">
+                  <div className="w-9 h-9 rounded-full bg-crm-primary/20 flex items-center justify-center text-crm-primary font-bold text-sm">
+                    {m.name?.charAt(0)}
+                  </div>
+                  {onlineUsers.includes(m._id) && (
+                    <span className="absolute bottom-0 right-0 block h-2.5 w-2.5 rounded-full bg-emerald-400 ring-2 ring-crm-darker" />
+                  )}
                 </div>
                 <div className="min-w-0">
                   <p className="text-sm font-medium text-white truncate">{m.name}</p>
@@ -296,8 +301,13 @@ const DirectMessages = () => {
                   selectedUser?._id === u._id ? 'bg-crm-primary/20' : 'hover:bg-crm-border/30'
                 }`}
               >
-                <div className="w-9 h-9 rounded-full bg-violet-500/20 flex items-center justify-center text-violet-300 font-bold text-sm">
-                  {u.name?.charAt(0)}
+                <div className="relative shrink-0">
+                  <div className="w-9 h-9 rounded-full bg-violet-500/20 flex items-center justify-center text-violet-300 font-bold text-sm">
+                    {u.name?.charAt(0)}
+                  </div>
+                  {onlineUsers.includes(u._id) && (
+                    <span className="absolute bottom-0 right-0 block h-2.5 w-2.5 rounded-full bg-emerald-400 ring-2 ring-crm-darker" />
+                  )}
                 </div>
                 <p className="text-sm font-medium text-white truncate">{u.name}</p>
               </button>
@@ -310,11 +320,27 @@ const DirectMessages = () => {
         {selectedUser ? (
           <>
             <div className="p-4 border-b border-crm-border flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-crm-primary to-crm-accent flex items-center justify-center text-white font-bold">
-                {selectedUser.name?.charAt(0)}
+              <div className="relative shrink-0">
+                <div className="w-10 h-10 rounded-full bg-gradient-to-br from-crm-primary to-crm-accent flex items-center justify-center text-white font-bold">
+                  {selectedUser.name?.charAt(0)}
+                </div>
+                {onlineUsers.includes(selectedUser._id) && (
+                  <span className="absolute bottom-0 right-0 block h-3 w-3 rounded-full bg-emerald-400 ring-2 ring-crm-darker" />
+                )}
               </div>
               <div>
-                <h3 className="font-bold text-white">{selectedUser.name}</h3>
+                <div className="flex items-center gap-2">
+                  <h3 className="font-bold text-white">{selectedUser.name}</h3>
+                  {onlineUsers.includes(selectedUser._id) ? (
+                    <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 animate-pulse">
+                      Online
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center px-1.5 py-0.5 rounded-full text-[10px] font-medium bg-crm-textMuted/10 text-crm-textMuted border border-crm-textMuted/20">
+                      Offline
+                    </span>
+                  )}
+                </div>
                 <p className="text-xs text-crm-textMuted">{selectedUser.role} · Direct message</p>
               </div>
             </div>

@@ -2,6 +2,9 @@ const Workspace = require('../models/Workspace');
 const User = require('../models/User');
 const Channel = require('../models/Channel');
 const Client = require('../models/Client');
+const SaaSClient = require('../models/SaaSClient');
+const SaaSMetaAccount = require('../models/SaaSMetaAccount');
+const encryptionService = require('../services/encryptionService');
 const { validateEmail, validatePasswordStrength } = require('../utils/validation');
 const {
   ensureGeneralChannel,
@@ -92,6 +95,12 @@ const getWorkspaces = async (req, res) => {
           model: User,
           as: 'admins',
           attributes: ['_id', 'name', 'email']
+        },
+        {
+          model: User,
+          as: 'members',
+          attributes: ['_id', 'name', 'email', 'role', 'secretCode'],
+          through: { attributes: [] }
         }
       ]
     });
@@ -275,11 +284,19 @@ const createClientWorkspace = async (req, res) => {
       password,
       secretCode,
       companyName,
+      adAccountId,
+      accessToken
     } = req.body;
 
     if (!name?.trim() || !clientName?.trim() || !email?.trim() || !password) {
       return res.status(400).json({
         message: 'Workspace name, client name, email, and password are required',
+      });
+    }
+
+    if (!adAccountId?.trim() || !accessToken?.trim()) {
+      return res.status(400).json({
+        message: 'Meta Ad Account ID and Access Token are required for ads integration',
       });
     }
 
@@ -292,8 +309,10 @@ const createClientWorkspace = async (req, res) => {
       return res.status(400).json({ message: passwordCheck.message });
     }
 
-    const emailExists = await User.findOne({ where: { email: email.trim() } });
-    if (emailExists) {
+    // Check if email already in use
+    const emailExistsUser = await User.findOne({ where: { email: email.trim() } });
+    const emailExistsSaaS = await SaaSClient.findOne({ where: { email: email.trim() } });
+    if (emailExistsUser || emailExistsSaaS) {
       return res.status(400).json({ message: 'Email already in use' });
     }
 
@@ -301,13 +320,45 @@ const createClientWorkspace = async (req, res) => {
       secretCode?.trim() ||
       `CL-${Math.random().toString(36).substring(2, 8).toUpperCase()}`;
 
-    const codeExists = await User.findOne({ where: { secretCode: generatedSecret } });
-    if (codeExists) {
+    // Check if secret key already exists
+    const codeExistsUser = await User.findOne({ where: { secretCode: generatedSecret } });
+    const codeExistsSaaS = await SaaSClient.findOne({ where: { secret_key: generatedSecret } });
+    if (codeExistsUser || codeExistsSaaS) {
       return res.status(400).json({ message: 'Secret key already in use. Try again.' });
     }
 
-    const inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase();
+    // Step 1: Save client into clients table
+    const saasClient = await SaaSClient.create({
+      company_name: companyName?.trim() || name.trim(),
+      client_name: clientName.trim(),
+      email: email.trim().toLowerCase(),
+      password,
+      secret_key: generatedSecret,
+      description: description?.trim() || '',
+      role: 'client'
+    });
 
+    // Step 2: Save Meta account credentials into meta_accounts table (with encrypted access token)
+    const encryptedToken = encryptionService.encrypt(accessToken.trim());
+    const metaAccount = await SaaSMetaAccount.create({
+      client_id: saasClient.id,
+      ad_account_id: adAccountId.trim(),
+      access_token: encryptedToken
+    });
+
+    // Step 3 & 4: Immediately connect Meta Marketing API and fetch last 180 days of historical data
+    let syncedCount = 0;
+    let syncError = null;
+    try {
+      const { syncHistoricalAndLive } = require('../services/saasMetaService');
+      syncedCount = await syncHistoricalAndLive(saasClient.id, adAccountId.trim(), accessToken.trim(), 180);
+    } catch (syncErr) {
+      console.error('[WORKSPACE_SETUP_SYNC_ERR] Sync failed but proceeding with creation:', syncErr.message);
+      syncError = syncErr.message;
+    }
+
+    // Step 5: Setup Workspace & Channel
+    const inviteCode = Math.random().toString(36).substring(2, 8).toUpperCase();
     const workspace = await Workspace.create({
       name: name.trim(),
       description: description?.trim() || '',
@@ -316,6 +367,10 @@ const createClientWorkspace = async (req, res) => {
       type: 'client',
     });
 
+    // Link workspace to SaaS Client
+    await saasClient.update({ workspace_id: workspace._id });
+
+    // Add admin and members to workspace
     await workspace.addMember(req.user._id);
     await workspace.addAdmin(req.user._id);
 
@@ -327,41 +382,25 @@ const createClientWorkspace = async (req, res) => {
     });
     await channel.addMember(req.user._id);
 
-    const clientUser = await User.create({
-      name: clientName.trim(),
-      email: email.trim(),
-      password,
-      secretCode: generatedSecret,
-      role: 'Client',
-    });
-
-    const clientProfile = await Client.create({
-      userId: clientUser._id,
-      companyName: companyName || name.trim(),
-      industry: '',
-      contactPerson: clientName.trim(),
-      email: email.trim(),
-      status: 'active',
-    });
-
-    await workspace.addMember(clientUser._id);
-    await channel.addMember(clientUser._id);
-
     res.status(201).json({
       workspace,
       clientCredentials: {
-        email: clientUser.email,
+        email: saasClient.email,
         secretCode: generatedSecret,
         password,
         inviteCode,
-        clientName: clientUser.name,
+        clientName: saasClient.client_name,
+        clientId: saasClient.id,
+        workspaceId: workspace._id
       },
       client: {
-        userId: clientUser._id,
-        clientId: clientProfile._id,
-        name: clientUser.name,
-        email: clientUser.email,
+        id: saasClient.id,
+        name: saasClient.client_name,
+        email: saasClient.email,
+        companyName: saasClient.company_name
       },
+      syncedRecords: syncedCount,
+      syncError: syncError
     });
   } catch (error) {
     console.error('[CREATE_CLIENT_WORKSPACE_ERR]', error);

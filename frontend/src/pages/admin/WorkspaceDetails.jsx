@@ -22,6 +22,9 @@ const WorkspaceDetails = ({ type }) => {
     const loadWorkspace = async () => {
       try {
         const wsRes = await api.get('/workspaces');
+        if (!Array.isArray(wsRes.data)) {
+          throw new Error('Invalid response format from workspaces API');
+        }
         const foundWs = wsRes.data.find((w) => w._id === id);
         if (!foundWs) {
           toast.error('Workspace not found');

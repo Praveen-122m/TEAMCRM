@@ -12,15 +12,15 @@ export default {
       },
       colors: {
         crm: {
-          dark: '#0f172a',      // slate-900 (Main BG)
-          darker: '#020617',    // slate-950
-          card: '#1e293b',      // slate-800 (Card BG)
-          primary: '#6366f1',   // indigo-500
-          primaryHover: '#4f46e5', // indigo-600
-          accent: '#8b5cf6',    // violet-500
-          border: '#334155',    // slate-700
-          text: '#f8fafc',      // slate-50
-          textMuted: '#94a3b8', // slate-400
+          dark: 'rgb(var(--color-bg-dark) / <alpha-value>)',
+          darker: 'rgb(var(--color-bg-darker) / <alpha-value>)',
+          card: 'rgb(var(--color-bg-card) / <alpha-value>)',
+          primary: 'rgb(var(--color-primary) / <alpha-value>)',
+          primaryHover: 'rgb(var(--color-primary-hover) / <alpha-value>)',
+          accent: 'rgb(var(--color-accent) / <alpha-value>)',
+          border: 'rgb(var(--color-border) / <alpha-value>)',
+          text: 'rgb(var(--color-text) / <alpha-value>)',
+          textMuted: 'rgb(var(--color-text-muted) / <alpha-value>)',
         },
       },
       backgroundImage: {

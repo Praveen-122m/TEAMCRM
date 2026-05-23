@@ -15,17 +15,19 @@ app.use(helmet({
 
 // ── CORS Configuration ──
 app.use(cors({
-  origin: true,
+  origin: [process.env.FRONTEND_URL, /^http:\/\/localhost:\d+$/].filter(Boolean),
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
   allowedHeaders: ['Content-Type', 'Authorization'],
   credentials: true
 }));
 
 // ── Request Logging ──
-app.use((req, res, next) => {
-  console.log(`${req.method} ${req.url}`);
-  next();
-});
+if (process.env.NODE_ENV !== 'production') {
+  app.use((req, res, next) => {
+    console.log(`${req.method} ${req.url}`);
+    next();
+  });
+}
 
 // ── Body Parsing ──
 app.use(express.json({ limit: '100mb' }));

@@ -2,6 +2,7 @@ const User = require('../models/User');
 const Workspace = require('../models/Workspace');
 const Channel = require('../models/Channel');
 const Client = require('../models/Client');
+const SaaSClient = require('../models/SaaSClient');
 const generateToken = require('../utils/generateToken');
 const { validateEmail, validatePasswordStrength } = require('../utils/validation');
 const { ensureGeneralChannel } = require('./channelController');
@@ -13,13 +14,51 @@ const authUser = async (req, res) => {
   try {
     const { email, password, secretCode } = req.body;
 
-    let user;
+    let user = null;
+    let saasClient = null;
+
     if (secretCode) {
-      user = await User.findOne({ where: { secretCode: secretCode.trim() } });
+      // 1. Check in SaaS clients table first
+      saasClient = await SaaSClient.findOne({ where: { secret_key: secretCode.trim() } });
+      if (!saasClient) {
+        // 2. Fallback to legacy User table
+        user = await User.findOne({ where: { secretCode: secretCode.trim() } });
+      }
     } else {
+      // 1. Check in standard User table
       user = await User.findOne({ where: { email } });
+      if (!user) {
+        // 2. Check in SaaS clients table
+        saasClient = await SaaSClient.findOne({ where: { email } });
+      }
     }
 
+    // Authenticate SaaS Client
+    if (saasClient && (await saasClient.matchPassword(password))) {
+      const workspace = saasClient.workspace_id ? await Workspace.findByPk(saasClient.workspace_id) : null;
+      const workspaceIds = workspace ? [workspace._id] : [];
+      const workspacesMeta = workspace ? [{
+        _id: workspace._id,
+        name: workspace.name,
+        type: workspace.type,
+        inviteCode: workspace.inviteCode
+      }] : [];
+
+      return res.json({
+        _id: saasClient.id,
+        name: saasClient.client_name,
+        email: saasClient.email,
+        role: 'Client',
+        profileImage: '',
+        workspaces: workspaceIds,
+        workspacesMeta,
+        activeWorkspace: saasClient.workspace_id || null,
+        clientProfileId: saasClient.id,
+        token: generateToken(saasClient.id),
+      });
+    }
+
+    // Authenticate Standard User
     if (user && (await user.matchPassword(password))) {
       const workspaces = await user.getWorkspaces({
         attributes: ['_id', 'name', 'type', 'inviteCode'],
@@ -41,26 +80,28 @@ const authUser = async (req, res) => {
         clientProfileId = clientProfile?._id || null;
       }
 
-      res.json({
+      return res.json({
         _id: user._id,
         name: user.name,
         email: user.email,
         role: user.role,
         profileImage: user.profileImage,
         workspaces: workspaceIds,
-        workspacesMeta: workspaces.map((w) => ({
-          _id: w._id,
-          name: w.name,
-          type: w.type,
-          inviteCode: w.inviteCode,
-        })),
+        workspacesMeta: workspaces
+          .filter((w) => workspaceIds.includes(w._id))
+          .map((w) => ({
+            _id: w._id,
+            name: w.name,
+            type: w.type,
+            inviteCode: w.inviteCode,
+          })),
         activeWorkspace,
         clientProfileId,
         token: generateToken(user._id),
       });
-    } else {
-      res.status(401).json({ message: 'Invalid credentials' });
     }
+
+    res.status(401).json({ message: 'Invalid credentials' });
   } catch (error) {
     console.error('[AUTH_ERR]', error);
     res.status(500).json({ message: 'Server Error', error: error.message });
@@ -230,6 +271,16 @@ const createClient = async (req, res) => {
       password,
       secretCode: secretCode.trim(),
       role: 'Client'
+    });
+
+    // Create Client Profile
+    await Client.create({
+      userId: user._id,
+      companyName: name.trim(),
+      industry: '',
+      contactPerson: name.trim(),
+      email: '',
+      status: 'active',
     });
 
     // Add Client to the Workspace members list explicitly

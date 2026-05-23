@@ -41,8 +41,6 @@ export const Sidebar = ({ isOpen, onClose }) => {
       { name: 'My Workspaces', path: '/member/workspaces', icon: Building },
       { name: 'Team Chat', path: '/channels', icon: MessageSquare },
       { name: 'Direct Messages', path: '/messages', icon: Users },
-      { name: 'Campaigns', path: '/meta-ads/campaigns', icon: Megaphone },
-      { name: 'Leads', path: '/leads', icon: Target },
       { name: 'Files', path: '/files', icon: FolderOpen },
     ],
     Client: [
@@ -79,11 +77,11 @@ export const Sidebar = ({ isOpen, onClose }) => {
             <div className="w-8 h-8 rounded-lg bg-gradient-to-br from-crm-primary to-crm-accent flex items-center justify-center shadow-glow">
               <span className="text-white font-bold text-xl leading-none tracking-tighter">C</span>
             </div>
-            <span className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-white to-crm-textMuted">
+            <span className="text-xl font-bold bg-clip-text text-transparent bg-gradient-to-r from-crm-text to-crm-textMuted">
               AgencyOS
             </span>
           </div>
-          <button onClick={onClose} className="lg:hidden text-crm-textMuted hover:text-white">
+          <button onClick={onClose} className="lg:hidden text-crm-textMuted hover:text-crm-text">
             <X size={20} />
           </button>
         </div>
@@ -107,7 +105,7 @@ export const Sidebar = ({ isOpen, onClose }) => {
                   `flex items-center gap-3 px-3 py-2.5 rounded-lg transition-all duration-200 group relative ${
                     isActive 
                       ? 'bg-crm-primary/10 text-crm-primary font-medium' 
-                      : 'text-crm-text hover:bg-crm-border/30 hover:text-white'
+                      : 'text-crm-text hover:bg-crm-border/30 hover:text-crm-primary'
                   }`
                 }
               >
@@ -116,7 +114,7 @@ export const Sidebar = ({ isOpen, onClose }) => {
                     {isActive && (
                       <div className="absolute left-0 top-1/2 -translate-y-1/2 w-1 h-8 bg-crm-primary rounded-r-full"></div>
                     )}
-                    <Icon size={18} className={isActive ? 'text-crm-primary' : 'text-crm-textMuted group-hover:text-white transition-colors'} />
+                    <Icon size={18} className={isActive ? 'text-crm-primary' : 'text-crm-textMuted group-hover:text-crm-primary transition-colors'} />
                     <span>{item.name}</span>
                   </>
                 )}
@@ -125,18 +123,7 @@ export const Sidebar = ({ isOpen, onClose }) => {
           })}
         </nav>
 
-        <div className="p-4 border-t border-crm-border">
-          <div className="bg-gradient-to-br from-crm-darker to-crm-card border border-crm-border rounded-xl p-4 relative overflow-hidden">
-            <div className="absolute top-0 right-0 w-16 h-16 bg-crm-primary/20 blur-2xl rounded-full"></div>
-            <p className="text-xs text-crm-textMuted mb-2">Workspace</p>
-            <p className="text-sm font-semibold text-white truncate">
-              {localStorage.getItem('activeWorkspaceName') || 'Select workspace'}
-            </p>
-            {totalUnread > 0 && (
-              <p className="text-[10px] text-rose-400 mt-1">{totalUnread} unread notification(s)</p>
-            )}
-          </div>
-        </div>
+
       </aside>
     </>
   );

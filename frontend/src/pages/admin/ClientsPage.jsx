@@ -26,18 +26,13 @@ const ClientsPage = () => {
 
   useEffect(() => {
     fetchClients();
-  }, [activeWorkspace]);
+  }, []);
 
   const fetchClients = async () => {
     try {
       setLoading(true);
-      if (activeWorkspace) {
-        const res = await clientService.getClients(activeWorkspace);
-        setClients(res.data);
-      } else {
-        setClients([]);
-        toast.error('Select a workspace from sidebar or open a client workspace first');
-      }
+      const res = await clientService.getClients();
+      setClients(res.data);
     } catch {
       toast.error('Failed to load clients');
     } finally {
@@ -127,13 +122,6 @@ const ClientsPage = () => {
       accessor: 'monthlyBudget',
       cell: (row) => (
         <span className="font-medium text-emerald-400">${row.monthlyBudget?.toLocaleString() || 0}</span>
-      ),
-    },
-    {
-      header: 'Status',
-      accessor: 'status',
-      cell: (row) => (
-        <span className={row.status === 'active' ? 'badge-active' : 'badge-inactive'}>{row.status}</span>
       ),
     },
     {

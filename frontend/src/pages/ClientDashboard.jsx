@@ -34,7 +34,7 @@ const ClientDashboard = () => {
     <div className="space-y-6">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-end gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-white tracking-tight mb-1">Welcome, {user?.name}</h1>
+          <h1 className="text-3xl font-bold text-crm-text tracking-tight mb-1">Welcome, {user?.name}</h1>
           <p className="text-crm-textMuted">
             {workspaceInfo?.workspace?.name
               ? `Your workspace: ${workspaceInfo.workspace.name}`
@@ -63,7 +63,7 @@ const ClientDashboard = () => {
 
       {workspaceId && user?.clientProfileId && (
         <div>
-          <h2 className="text-xl font-bold text-white mb-4">Your Meta Ads Performance</h2>
+          <h2 className="text-xl font-bold text-crm-text mb-4">Your Meta Ads Performance</h2>
           <MetaAdsDashboard embedded workspaceId={workspaceId} fixedClientId={user.clientProfileId} clientLabel={user.name} />
         </div>
       )}

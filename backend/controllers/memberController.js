@@ -141,7 +141,9 @@ const getAssignedClients = async (req, res) => {
     if (!member) {
       member = await Member.findOne({ where: { userId: req.params.id } });
     }
-    if (!member) return res.status(404).json({ message: 'Member not found' });
+    if (!member) {
+      return res.json([]);
+    }
 
     const assignments = await ClientAssignment.findAll({
       where: { memberId: member._id, status: 'active' },

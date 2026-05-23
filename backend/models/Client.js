@@ -53,7 +53,8 @@ const Client = sequelize.define('Client', {
     defaultValue: ''
   }
 }, {
-  timestamps: true
+  timestamps: true,
+  tableName: 'client_profiles'
 });
 
 module.exports = Client;

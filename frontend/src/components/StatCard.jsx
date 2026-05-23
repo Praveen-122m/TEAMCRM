@@ -26,7 +26,7 @@ export const StatCard = ({ title, value, icon: Icon, trend, trendValue, color = 
       <div className="flex justify-between items-start mb-4 relative z-10">
         <div>
           <p className="text-crm-textMuted text-sm font-medium mb-1">{title}</p>
-          <h3 className="text-3xl font-bold text-white tracking-tight">{value}</h3>
+          <h3 className="text-3xl font-bold text-crm-text tracking-tight">{value}</h3>
         </div>
         <div className={`p-3 rounded-xl border ${iconClasses}`}>
           <Icon size={24} />
