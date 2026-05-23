@@ -9,7 +9,6 @@ import toast from 'react-hot-toast';
 import {
   Download,
   Eye,
-  UserPlus,
   Trash2,
   Search,
   RefreshCw,
@@ -42,7 +41,7 @@ const LeadCenter = () => {
 
   const buildParams = useCallback(
     () => ({
-      workspaceId: wsId,
+      workspaceId: role === 'Admin' ? undefined : wsId,
       search: search || undefined,
       clientId: filterClient || undefined,
       status: filterStatus || undefined,
@@ -77,7 +76,7 @@ const LeadCenter = () => {
 
   useEffect(() => {
     if (!wsId || role === 'Client') return;
-    clientService.getClients(wsId).then((r) => setClients(r.data || [])).catch(() => {});
+    clientService.getClients(role === 'Admin' ? undefined : wsId).then((r) => setClients(r.data || [])).catch(() => {});
     if (role === 'Admin') {
       memberService.getMembers(wsId).then((r) => setMembers(r.data || [])).catch(() => {});
     }
@@ -311,22 +310,9 @@ const LeadCenter = () => {
                           <Eye size={16} />
                         </button>
                         {isAdmin && (
-                          <>
-                            <button
-                              type="button"
-                              className="p-2 hover:text-crm-primary"
-                              title="Quick assign"
-                              onClick={() => {
-                                const mid = members[0]?._id;
-                                if (mid) handleAssign(row._id, mid);
-                              }}
-                            >
-                              <UserPlus size={16} />
-                            </button>
-                            <button type="button" onClick={() => handleDelete(row._id)} className="p-2 hover:text-rose-400" title="Delete">
-                              <Trash2 size={16} />
-                            </button>
-                          </>
+                          <button type="button" onClick={() => handleDelete(row._id)} className="p-2 hover:text-rose-400" title="Delete">
+                            <Trash2 size={16} />
+                          </button>
                         )}
                       </div>
                     </td>

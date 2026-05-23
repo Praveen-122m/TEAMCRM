@@ -1,9 +1,21 @@
-const MetaAdsConnection = require('../models/MetaAdsConnection');
-const MetaAdsCampaign = require('../models/MetaAdsCampaign');
-const MetaAdsLead = require('../models/MetaAdsLead');
-const Client = require('../models/Client');
+const SaaSClient = require('../models/SaaSClient');
+const SaaSMetaAccount = require('../models/SaaSMetaAccount');
+const SaaSMetaAdsInsight = require('../models/SaaSMetaAdsInsight');
+const { encrypt, decrypt } = require('../services/encryptionService');
+const { syncHistoricalAndLive } = require('../services/saasMetaService');
 const metaApiService = require('../services/metaApiService');
-const encryptionService = require('../services/encryptionService');
+
+/**
+ * Authorization Helper
+ */
+const checkMetaAccess = async (req, clientId) => {
+  if (!clientId) return false;
+  if (req.user.role === 'Admin') return true;
+  if (req.user.role === 'Client') {
+    return req.user._id.toString() === clientId.toString();
+  }
+  return false;
+};
 
 /**
  * Start Meta OAuth flow
@@ -16,14 +28,12 @@ const connectMeta = async (req, res) => {
       return res.status(400).json({ message: 'Client ID and Workspace ID required' });
     }
     
-    // Check if client exists
-    const client = await Client.findByPk(clientId);
+    const client = await SaaSClient.findByPk(clientId);
     if (!client) {
       return res.status(404).json({ message: 'Client not found' });
     }
 
     const authUrl = metaApiService.getAuthUrl();
-    // We append state to the auth URL to track clientId and workspaceId
     const state = Buffer.from(JSON.stringify({ clientId, workspaceId })).toString('base64');
     
     res.redirect(`${authUrl}&state=${state}`);
@@ -43,11 +53,11 @@ const metaCallback = async (req, res) => {
     
     if (error) {
       console.error('[META_OAUTH_ERROR]', error, error_description);
-      return res.redirect(`${process.env.FRONTEND_URL}/meta-ads/dashboard?error=auth_failed`);
+      return res.redirect(`${process.env.FRONTEND_URL}/meta-ads?error=auth_failed`);
     }
 
     if (!code || !state) {
-      return res.redirect(`${process.env.FRONTEND_URL}/meta-ads/dashboard?error=invalid_request`);
+      return res.redirect(`${process.env.FRONTEND_URL}/meta-ads?error=invalid_request`);
     }
 
     const { clientId, workspaceId } = JSON.parse(Buffer.from(state, 'base64').toString('utf8'));
@@ -59,48 +69,49 @@ const metaCallback = async (req, res) => {
     const longLivedTokenData = await metaApiService.getLongLivedToken(tokenData.access_token);
     
     // Encrypt the token
-    const encryptedToken = encryptionService.encrypt(longLivedTokenData.access_token);
+    const encryptedToken = encrypt(longLivedTokenData.access_token);
 
     // Save to database
-    let connection = await MetaAdsConnection.findOne({ where: { clientId } });
+    let connection = await SaaSMetaAccount.findOne({ where: { client_id: clientId } });
     
     if (connection) {
       await connection.update({
-        status: 'connected',
-        accessToken: encryptedToken,
-        tokenExpiresAt: new Date(Date.now() + (longLivedTokenData.expires_in * 1000) || 5184000000), // Default 60 days
+        access_token: encryptedToken
       });
     } else {
-      connection = await MetaAdsConnection.create({
-        workspaceId,
-        clientId,
-        status: 'connected',
-        accessToken: encryptedToken,
-        tokenExpiresAt: new Date(Date.now() + (longLivedTokenData.expires_in * 1000) || 5184000000),
+      connection = await SaaSMetaAccount.create({
+        client_id: clientId,
+        ad_account_id: '',
+        access_token: encryptedToken
       });
     }
 
-    res.redirect(`${process.env.FRONTEND_URL}/meta-ads/dashboard?success=connected`);
+    res.redirect(`${process.env.FRONTEND_URL}/meta-ads?success=connected`);
   } catch (error) {
     console.error('[META_CALLBACK_ERR]', error);
-    res.redirect(`${process.env.FRONTEND_URL}/meta-ads/dashboard?error=server_error`);
+    res.redirect(`${process.env.FRONTEND_URL}/meta-ads?error=server_error`);
   }
 };
 
 /**
- * Fetch ad accounts
+ * Fetch ad accounts for the client
  * GET /api/meta-ads/accounts?clientId=xxx
  */
 const getAdAccounts = async (req, res) => {
   try {
     const { clientId } = req.query;
-    const connection = await MetaAdsConnection.findOne({ where: { clientId, status: 'connected' } });
     
-    if (!connection || !connection.accessToken) {
+    if (!(await checkMetaAccess(req, clientId))) {
+      return res.status(403).json({ message: 'Access denied to this client data' });
+    }
+
+    const connection = await SaaSMetaAccount.findOne({ where: { client_id: clientId } });
+    
+    if (!connection || !connection.access_token) {
       return res.status(400).json({ message: 'Meta Ads not connected' });
     }
 
-    const accessToken = encryptionService.decrypt(connection.accessToken);
+    const accessToken = decrypt(connection.access_token);
     const accounts = await metaApiService.fetchAdAccounts(accessToken);
     
     res.json(accounts);
@@ -116,14 +127,14 @@ const getAdAccounts = async (req, res) => {
  */
 const selectAdAccount = async (req, res) => {
   try {
-    const { clientId, adAccountId, name } = req.body;
-    const connection = await MetaAdsConnection.findOne({ where: { clientId } });
+    const { clientId, adAccountId } = req.body;
+    const connection = await SaaSMetaAccount.findOne({ where: { client_id: clientId } });
     
     if (!connection) {
       return res.status(404).json({ message: 'Connection not found' });
     }
 
-    await connection.update({ adAccountId, name });
+    await connection.update({ ad_account_id: adAccountId });
     res.json(connection);
   } catch (error) {
     console.error('[SELECT_ACCOUNT_ERR]', error);
@@ -132,172 +143,204 @@ const selectAdAccount = async (req, res) => {
 };
 
 /**
- * Sync campaigns from Meta to our database
- * POST /api/meta-ads/sync-campaigns?clientId=xxx
+ * Sync campaigns / insights from Meta to our database (on-demand click)
+ * POST /api/meta-ads/sync-campaigns
  */
 const syncCampaigns = async (req, res) => {
   try {
-    const { clientId, workspaceId } = req.query;
-    const connection = await MetaAdsConnection.findOne({ where: { clientId, status: 'connected' } });
-    
-    if (!connection || !connection.accessToken || !connection.adAccountId) {
-      // Mock Data Fallback for Development
-      return generateMockCampaigns(workspaceId, clientId, res);
+    const { clientId } = req.query;
+
+    let targetClientId = clientId;
+    if (req.user.role === 'Client') {
+      targetClientId = req.user._id;
     }
 
-    const accessToken = encryptionService.decrypt(connection.accessToken);
-    const metaCampaigns = await metaApiService.fetchCampaigns(accessToken, connection.adAccountId);
-    
-    for (const mc of metaCampaigns) {
-      const insights = mc.insights && mc.insights.data && mc.insights.data.length > 0 ? mc.insights.data[0] : {};
-      
-      const campaignData = {
-        name: mc.name,
-        status: mc.status === 'ACTIVE' ? 'active' : (mc.status === 'PAUSED' ? 'paused' : 'archived'),
-        objective: mc.objective,
-        budget: mc.daily_budget ? (mc.daily_budget / 100) : (mc.lifetime_budget ? (mc.lifetime_budget / 100) : 0),
-        spend: insights.spend || 0,
-        impressions: insights.impressions || 0,
-        clicks: insights.clicks || 0,
-        ctr: insights.ctr || 0,
-        cpc: insights.cpc || 0,
-        conversions: insights.conversions ? insights.conversions[0]?.value || 0 : 0,
-        startDate: mc.start_time,
-        endDate: mc.stop_time
-      };
-
-      const existing = await MetaAdsCampaign.findOne({ where: { clientId, name: mc.name } });
-      if (existing) {
-        await existing.update(campaignData);
-      } else {
-        await MetaAdsCampaign.create({ ...campaignData, clientId, workspaceId });
-      }
+    if (!targetClientId) {
+      return res.status(400).json({ message: 'Client ID required' });
     }
 
-    res.json({ message: 'Campaigns synced successfully', count: metaCampaigns.length });
+    if (!(await checkMetaAccess(req, targetClientId))) {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+
+    const acc = await SaaSMetaAccount.findOne({ where: { client_id: targetClientId } });
+    const decryptedToken = acc ? decrypt(acc.access_token) : 'demo';
+    const adAccountId = acc ? acc.ad_account_id : 'act_123456789';
+
+    // Sync latest 30 days on manual trigger
+    const count = await syncHistoricalAndLive(targetClientId, adAccountId, decryptedToken, 30);
+    res.json({ message: 'Meta Ads metrics synced successfully', count });
   } catch (error) {
     console.error('[SYNC_CAMPAIGNS_ERR]', error);
-    res.status(500).json({ message: 'Failed to sync campaigns' });
+    res.status(500).json({ message: 'Sync failed: ' + error.message });
   }
 };
 
 /**
- * Sync leads from Meta to our database
- * POST /api/meta-ads/sync-leads?clientId=xxx
+ * Sync leads from Meta to our database (alias/backward compatibility)
+ * POST /api/meta-ads/sync-leads
  */
 const syncLeads = async (req, res) => {
   try {
-    const { clientId, workspaceId } = req.query;
-    const connection = await MetaAdsConnection.findOne({ where: { clientId, status: 'connected' } });
-    
-    if (!connection || !connection.accessToken || !connection.adAccountId) {
-      // Mock Data Fallback for Development
-      return generateMockLeads(workspaceId, clientId, res);
+    const { clientId } = req.query;
+
+    let targetClientId = clientId;
+    if (req.user.role === 'Client') {
+      targetClientId = req.user._id;
     }
 
-    const accessToken = encryptionService.decrypt(connection.accessToken);
-    const metaLeads = await metaApiService.fetchLeads(accessToken, connection.adAccountId);
-    
-    for (const ml of metaLeads) {
-      let email = '', phone = '', name = '';
-      if (ml.field_data) {
-        for (const field of ml.field_data) {
-          if (field.name === 'email') email = field.values[0];
-          if (field.name === 'phone_number') phone = field.values[0];
-          if (field.name === 'full_name') name = field.values[0];
-          if (field.name === 'first_name') name = field.values[0] + (name ? ' ' + name : '');
-        }
-      }
-
-      const leadData = {
-        name: name || 'Unknown',
-        email: email || 'unknown@example.com',
-        phone: phone,
-        platform: 'Facebook',
-        submittedAt: ml.created_time
-      };
-
-      const existing = await MetaAdsLead.findOne({ where: { clientId, email: leadData.email, submittedAt: leadData.submittedAt } });
-      if (!existing) {
-        // Try to match campaign
-        let campaignId = null;
-        if (ml.campaign_id) {
-            const campaign = await MetaAdsCampaign.findOne({where: {clientId, name: ml.campaign_name}});
-            if(campaign) {
-                campaignId = campaign._id;
-            }
-        }
-        await MetaAdsLead.create({ ...leadData, clientId, workspaceId, campaignId });
-      }
+    if (!targetClientId) {
+      return res.status(400).json({ message: 'Client ID required' });
     }
 
-    res.json({ message: 'Leads synced successfully', count: metaLeads.length });
+    if (!(await checkMetaAccess(req, targetClientId))) {
+      return res.status(403).json({ message: 'Access denied' });
+    }
+
+    const acc = await SaaSMetaAccount.findOne({ where: { client_id: targetClientId } });
+    const decryptedToken = acc ? decrypt(acc.access_token) : 'demo';
+    const adAccountId = acc ? acc.ad_account_id : 'act_123456789';
+
+    const count = await syncHistoricalAndLive(targetClientId, adAccountId, decryptedToken, 30);
+    res.json({ message: 'Leads and analytics synced successfully', count });
   } catch (error) {
     console.error('[SYNC_LEADS_ERR]', error);
-    res.status(500).json({ message: 'Failed to sync leads' });
+    res.status(500).json({ message: 'Sync failed: ' + error.message });
   }
 };
 
 /**
- * Get aggregated Meta Ads analytics
- * GET /api/meta-ads/analytics?clientId=xxx
+ * Get aggregated Meta Ads analytics from MySQL using client_id
+ * GET /api/meta-ads/analytics
  */
 const getAnalytics = async (req, res) => {
   try {
-    const { clientId } = req.query;
-    const campaigns = await MetaAdsCampaign.findAll({ where: { clientId } });
+    const { clientId, startDate, endDate } = req.query;
 
-    let totalSpend = 0, totalImpressions = 0, totalClicks = 0, totalConversions = 0;
+    let targetClientId = clientId;
+    if (req.user.role === 'Client') {
+      targetClientId = req.user._id;
+    }
 
-    campaigns.forEach(c => {
-      totalSpend += parseFloat(c.spend || 0);
-      totalImpressions += parseInt(c.impressions || 0);
-      totalClicks += parseInt(c.clicks || 0);
-      totalConversions += parseInt(c.conversions || 0);
+    if (!targetClientId || targetClientId === 'demo' || targetClientId === 'null') {
+      // Fallback if no clients exist yet, find first client in DB
+      const firstClient = await SaaSClient.findOne();
+      if (firstClient) {
+        targetClientId = firstClient.id;
+      } else {
+        return res.json({
+          totalSpend: 0,
+          totalImpressions: 0,
+          totalClicks: 0,
+          totalLinkClicks: 0,
+          totalLandingPageViews: 0,
+          totalInstagramFollowers: 0,
+          totalPurchases: 0,
+          totalLeads: 0,
+          totalMessagingConversationsStarted: 0,
+          dailyTimeline: []
+        });
+      }
+    }
+
+    if (!(await checkMetaAccess(req, targetClientId))) {
+      return res.status(403).json({ message: 'Access denied to client analytics' });
+    }
+
+    const { Op } = require('sequelize');
+    const whereClause = { client_id: targetClientId };
+
+    if (startDate && endDate) {
+      whereClause.date = {
+        [Op.between]: [startDate, endDate]
+      };
+    } else {
+      // Default to last 30 days
+      const end = new Date().toISOString().split('T')[0];
+      const start = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+      whereClause.date = {
+        [Op.between]: [start, end]
+      };
+    }
+
+    // MANDATORY client_id filtering
+    const insights = await SaaSMetaAdsInsight.findAll({
+      where: whereClause,
+      order: [['date', 'ASC']]
     });
 
-    const ctr = totalImpressions > 0 ? parseFloat(((totalClicks / totalImpressions) * 100).toFixed(2)) : 0;
-    const cpc = totalClicks > 0 ? parseFloat((totalSpend / totalClicks).toFixed(2)) : 0;
-    const roas = totalSpend > 0 ? parseFloat(((totalConversions * 50) / totalSpend).toFixed(2)) : 0; // dummy roas calc
+    let totalSpend = 0;
+    let totalImpressions = 0;
+    let totalClicks = 0;
+    let totalLinkClicks = 0;
+    let totalLandingPageViews = 0;
+    let totalPurchases = 0;
+    let totalLeads = 0;
+    let totalMessagingConversationsStarted = 0;
+    let latestInstagramFollowers = 0;
 
-    const demographics = {
-      gender: { male: 42, female: 58 },
-      ageBrackets: [
-        { bracket: '18-24', percentage: 12 },
-        { bracket: '25-34', percentage: 48 },
-        { bracket: '35-44', percentage: 25 },
-        { bracket: '45+', percentage: 15 }
-      ]
-    };
+    let latestDate = null;
 
-    const geographicReach = {
-      topRegion: 'North America',
-      activeMarkets: 42,
-      regions: [
-        { name: 'North America', share: 60 },
-        { name: 'Europe', share: 20 },
-        { name: 'Asia Pacific', share: 15 },
-        { name: 'Latin America', share: 5 }
-      ]
-    };
+    insights.forEach(rec => {
+      totalSpend += parseFloat(rec.spend || 0);
+      totalImpressions += parseInt(rec.impressions || 0);
+      totalClicks += parseInt(rec.clicks || 0);
+      totalLinkClicks += parseInt(rec.link_clicks || 0);
+      totalLandingPageViews += parseInt(rec.landing_page_views || 0);
+      totalPurchases += parseInt(rec.purchases || 0);
+      totalLeads += parseInt(rec.leads || 0);
+      totalMessagingConversationsStarted += parseInt(rec.messaging_conversations_started || 0);
+      
+      if (!latestDate || rec.date > latestDate) {
+        latestDate = rec.date;
+        latestInstagramFollowers = parseInt(rec.instagram_followers || 0);
+      } else if (rec.date === latestDate) {
+        latestInstagramFollowers = Math.max(latestInstagramFollowers, parseInt(rec.instagram_followers || 0));
+      }
+    });
 
-    const placements = {
-      feeds: 65,
-      stories: 22,
-      reels: 13
-    };
+    // Group daily metrics for the charts
+    const dailyMap = {};
+    insights.forEach(rec => {
+      const d = rec.date;
+      if (!dailyMap[d]) {
+        dailyMap[d] = {
+          date: d,
+          spend: 0,
+          impressions: 0,
+          clicks: 0,
+          link_clicks: 0,
+          landing_page_views: 0,
+          purchases: 0,
+          leads: 0,
+          messaging_conversations_started: 0,
+          instagram_followers: 0
+        };
+      }
+      dailyMap[d].spend += parseFloat(rec.spend || 0);
+      dailyMap[d].impressions += parseInt(rec.impressions || 0);
+      dailyMap[d].clicks += parseInt(rec.clicks || 0);
+      dailyMap[d].link_clicks += parseInt(rec.link_clicks || 0);
+      dailyMap[d].landing_page_views += parseInt(rec.landing_page_views || 0);
+      dailyMap[d].purchases += parseInt(rec.purchases || 0);
+      dailyMap[d].leads += parseInt(rec.leads || 0);
+      dailyMap[d].messaging_conversations_started += parseInt(rec.messaging_conversations_started || 0);
+      dailyMap[d].instagram_followers = Math.max(dailyMap[d].instagram_followers, parseInt(rec.instagram_followers || 0));
+    });
+
+    const dailyTimeline = Object.values(dailyMap).sort((a, b) => a.date.localeCompare(b.date));
 
     res.json({
-      totalSpend,
+      totalSpend: parseFloat(totalSpend.toFixed(2)),
       totalImpressions,
       totalClicks,
-      totalConversions,
-      ctr,
-      cpc,
-      roas,
-      demographics,
-      geographicReach,
-      placements
+      totalLinkClicks,
+      totalLandingPageViews,
+      totalInstagramFollowers: latestInstagramFollowers,
+      totalPurchases,
+      totalLeads,
+      totalMessagingConversationsStarted,
+      dailyTimeline
     });
   } catch (error) {
     console.error('[GET_ANALYTICS_ERR]', error);
@@ -305,49 +348,12 @@ const getAnalytics = async (req, res) => {
   }
 };
 
-/**
- * Mock Data Generators
- */
-const generateMockCampaigns = async (workspaceId, clientId, res) => {
-    const count = await MetaAdsCampaign.count({where: {clientId}});
-    if(count === 0) {
-        await MetaAdsCampaign.bulkCreate([
-            {
-              workspaceId, clientId,
-              name: 'Spring Lifestyle Campaign 01',
-              objective: 'Traffic',
-              creativeType: 'IMAGE AD',
-              budget: 150.00, spend: 120.50, impressions: 24500, clicks: 794, ctr: 3.24, cpc: 0.82, conversions: 28, status: 'active'
-            },
-            {
-              workspaceId, clientId,
-              name: 'B2B Solutions - Video A',
-              objective: 'Leads',
-              creativeType: 'VIDEO AD',
-              budget: 350.00, spend: 288.00, impressions: 45000, clicks: 1296, ctr: 2.88, cpc: 1.45, conversions: 98, status: 'active'
-            }
-        ]);
-    }
-    const campaigns = await MetaAdsCampaign.findAll({where: {clientId}});
-    res.json({message: 'Mock campaigns synced', campaigns});
+module.exports = {
+  connectMeta,
+  metaCallback,
+  getAdAccounts,
+  selectAdAccount,
+  syncCampaigns,
+  syncLeads,
+  getAnalytics
 };
-
-const generateMockLeads = async (workspaceId, clientId, res) => {
-    const count = await MetaAdsLead.count({where: {clientId}});
-    if(count === 0) {
-        await MetaAdsLead.bulkCreate([
-            {
-              workspaceId, clientId,
-              name: 'Rohan Sharma', email: 'rohan.sharma@example.com', phone: '+91 98765 43210', status: 'NEW', source: 'Meta Ads', platform: 'Facebook'
-            },
-            {
-              workspaceId, clientId,
-              name: 'Sneha Patel', email: 'sneha.patel@example.com', phone: '+91 99887 76655', status: 'CONTACTED', source: 'Instagram', platform: 'Instagram'
-            }
-        ]);
-    }
-    const leads = await MetaAdsLead.findAll({where: {clientId}});
-    res.json({message: 'Mock leads synced', leads});
-};
-
-module.exports = { connectMeta, metaCallback, getAdAccounts, selectAdAccount, syncCampaigns, syncLeads, getAnalytics };

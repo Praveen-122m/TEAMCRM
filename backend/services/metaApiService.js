@@ -90,28 +90,6 @@ const fetchCampaigns = async (accessToken, adAccountId) => {
   }
 };
 
-/**
- * Fetch Analytics/Insights from Meta Ads API
- */
-const fetchAnalytics = async (accessToken, adAccountId, dateRange = {}) => {
-  try {
-    const params = {
-      access_token: accessToken,
-      fields: 'spend,impressions,clicks,ctr,cpc,cpp,conversions,actions,cost_per_action_type',
-      time_range: JSON.stringify({
-        since: dateRange.since || new Date(Date.now() - 30 * 86400000).toISOString().split('T')[0],
-        until: dateRange.until || new Date().toISOString().split('T')[0]
-      }),
-      level: 'account'
-    };
-
-    const response = await axios.get(`${META_GRAPH_URL}/${adAccountId}/insights`, { params });
-    return response.data.data || [];
-  } catch (error) {
-    console.error('[META_API] Fetch analytics failed:', error.response?.data || error.message);
-    return [];
-  }
-};
 
 /**
  * Fetch Leads from Meta Lead Ads
@@ -152,6 +130,5 @@ module.exports = {
   getLongLivedToken,
   fetchAdAccounts,
   fetchCampaigns,
-  fetchAnalytics,
   fetchLeads
 };

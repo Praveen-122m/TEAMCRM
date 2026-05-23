@@ -1,5 +1,4 @@
 const { Op } = require('sequelize');
-const { Parser } = require('json2csv');
 const PDFDocument = require('pdfkit');
 const MetaAdsLead = require('../models/MetaAdsLead');
 const MetaAdsCampaign = require('../models/MetaAdsCampaign');
@@ -159,7 +158,7 @@ const getLeadById = async (req, res) => {
 
     if (req.user.role === 'Client') {
       const cid = await getClientProfileId(req.user._id);
-      if (lead.clientId?.toString() !== cid?.toString()) {
+      if (!cid || !lead.clientId || lead.clientId.toString() !== cid.toString()) {
         return res.status(403).json({ message: 'Access denied' });
       }
     }
@@ -365,25 +364,32 @@ const exportCsv = async (req, res) => {
     const leads = await fetchLeadsForExport(req);
     const rows = leads.map((l) => {
       const f = formatLead(l);
-      return {
-        'Lead Name': f.name,
-        Phone: f.phone,
-        Email: f.email,
-        Client: f.clientName,
-        Campaign: f.campaignName,
-        'Assigned Member': f.assignedMemberName,
-        Source: f.leadSource,
-        Status: f.status,
-        Date: f.date,
-        Notes: f.notes,
-      };
+      return [
+        f.name || '',
+        f.phone || '',
+        f.email || '',
+        f.clientName || '',
+        f.campaignName || '',
+        f.assignedMemberName || '',
+        f.leadSource || '',
+        f.status || '',
+        f.date ? new Date(f.date).toLocaleDateString() : '',
+        (f.notes || '').replace(/(\r\n|\n|\r)/gm, ' ')
+      ];
     });
-    const parser = new Parser();
-    const csv = parser.parse(rows.length ? rows : [{ 'Lead Name': '' }]);
+    
+    const headers = ['Lead Name', 'Phone', 'Email', 'Client', 'Campaign', 'Assigned Member', 'Source', 'Status', 'Date', 'Notes'];
+    const escapeCsv = (str) => `"${String(str).replace(/"/g, '""')}"`;
+    const csvContent = [
+      headers.map(escapeCsv).join(','),
+      ...rows.map(row => row.map(escapeCsv).join(','))
+    ].join('\n');
+
     res.header('Content-Type', 'text/csv');
     res.header('Content-Disposition', 'attachment; filename=leads-export.csv');
-    res.send(csv);
+    res.send(csvContent);
   } catch (error) {
+    console.error('CSV Export Error:', error);
     res.status(500).json({ message: 'Export failed' });
   }
 };
@@ -393,24 +399,31 @@ const exportExcel = async (req, res) => {
     const leads = await fetchLeadsForExport(req);
     const rows = leads.map((l) => {
       const f = formatLead(l);
-      return {
-        'Lead Name': f.name,
-        Phone: f.phone,
-        Email: f.email,
-        Client: f.clientName,
-        Campaign: f.campaignName,
-        Member: f.assignedMemberName,
-        Source: f.leadSource,
-        Status: f.status,
-        Date: f.date,
-      };
+      return [
+        f.name || '',
+        f.phone || '',
+        f.email || '',
+        f.clientName || '',
+        f.campaignName || '',
+        f.assignedMemberName || '',
+        f.leadSource || '',
+        f.status || '',
+        f.date ? new Date(f.date).toLocaleDateString() : ''
+      ];
     });
-    const parser = new Parser();
-    const csv = parser.parse(rows.length ? rows : [{ 'Lead Name': '' }]);
+
+    const headers = ['Lead Name', 'Phone', 'Email', 'Client', 'Campaign', 'Member', 'Source', 'Status', 'Date'];
+    const escapeCsv = (str) => `"${String(str).replace(/"/g, '""')}"`;
+    const csvContent = [
+      headers.map(escapeCsv).join(','),
+      ...rows.map(row => row.map(escapeCsv).join(','))
+    ].join('\n');
+
     res.header('Content-Type', 'application/vnd.ms-excel');
     res.header('Content-Disposition', 'attachment; filename=leads-export.xls');
-    res.send(csv);
+    res.send(csvContent);
   } catch (error) {
+    console.error('Excel Export Error:', error);
     res.status(500).json({ message: 'Export failed' });
   }
 };

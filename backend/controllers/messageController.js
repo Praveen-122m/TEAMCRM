@@ -318,7 +318,7 @@ const deleteMessage = async (req, res) => {
     if (!message) return res.status(404).json({ message: 'Message not found' });
 
     // Only sender or Admin can delete
-    if (message.senderId !== req.user._id && req.user.role !== 'Admin') {
+    if (message.senderId.toString() !== req.user._id.toString() && req.user.role !== 'Admin') {
       return res.status(403).json({ message: 'Not authorized to delete this message' });
     }
 

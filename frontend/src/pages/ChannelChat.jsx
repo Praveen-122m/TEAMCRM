@@ -11,7 +11,7 @@ import CreateChannelModal from '../components/modals/CreateChannelModal';
 
 const ChannelChat = ({ isEmbedded = false, workspaceId: workspaceIdProp, workspaceName }) => {
   const { user, activeWorkspace, setActiveWorkspace } = useAuth();
-  const { socket, isConnected, clearUnread } = useContext(SocketContext);
+  const { socket, isConnected, clearUnread, onlineUsers = [] } = useContext(SocketContext);
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -529,8 +529,13 @@ const ChannelChat = ({ isEmbedded = false, workspaceId: workspaceIdProp, workspa
                 {isChannel ? (
                   <Hash size={16} className={isSelected ? 'text-crm-primary' : 'text-crm-textMuted'} />
                 ) : (
-                  <div className="w-7 h-7 rounded-full bg-crm-primary/20 flex items-center justify-center text-crm-primary text-xs font-bold shrink-0">
-                    {item.name?.charAt(0)}
+                  <div className="relative shrink-0">
+                    <div className="w-7 h-7 rounded-full bg-crm-primary/20 flex items-center justify-center text-crm-primary text-xs font-bold shrink-0">
+                      {item.name?.charAt(0)}
+                    </div>
+                    {onlineUsers.includes(item._id) && (
+                      <span className="absolute bottom-0 right-0 block h-2 w-2 rounded-full bg-emerald-400 ring-1 ring-crm-darker" />
+                    )}
                   </div>
                 )}
                 <span className="text-sm font-medium truncate">{item.name}</span>

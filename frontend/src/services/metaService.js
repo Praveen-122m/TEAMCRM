@@ -6,5 +6,5 @@ export const metaService = {
   selectAdAccount: (data) => api.post('/meta-ads/account', data),
   syncCampaigns: (clientId, workspaceId) => api.post('/meta-ads/sync-campaigns', null, { params: { clientId, workspaceId } }),
   syncLeads: (clientId, workspaceId) => api.post('/meta-ads/sync-leads', null, { params: { clientId, workspaceId } }),
-  getAnalytics: (clientId) => api.get('/meta-ads/analytics', { params: { clientId } }),
+  getAnalytics: (clientId, startDate, endDate) => api.get('/meta-ads/analytics', { params: { clientId, startDate, endDate } }),
 };

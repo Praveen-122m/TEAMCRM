@@ -3,6 +3,30 @@
 @tailwind utilities;
 
 @layer base {
+  :root {
+    --color-bg-dark: 15 23 42;      /* slate-900 (Main BG) */
+    --color-bg-darker: 2 6 23;      /* slate-950 */
+    --color-bg-card: 30 41 59;      /* slate-800 (Card BG) */
+    --color-primary: 99 102 241;    /* indigo-500 */
+    --color-primary-hover: 79 70 229; /* indigo-600 */
+    --color-accent: 139 92 246;     /* violet-500 */
+    --color-border: 51 65 85;       /* slate-700 */
+    --color-text: 248 250 252;      /* slate-50 */
+    --color-text-muted: 148 163 184; /* slate-400 */
+  }
+
+  .light-theme {
+    --color-bg-dark: 241 245 249;   /* slate-100 (Main BG) */
+    --color-bg-darker: 226 232 240; /* slate-200 */
+    --color-bg-card: 255 255 255;   /* white (Card BG) */
+    --color-primary: 99 102 241;    /* indigo-500 */
+    --color-primary-hover: 79 70 229; /* indigo-600 */
+    --color-accent: 139 92 246;     /* violet-500 */
+    --color-border: 203 213 225;    /* slate-300 */
+    --color-text: 15 23 42;         /* slate-900 */
+    --color-text-muted: 71 85 105;  /* slate-600 */
+  }
+
   body {
     @apply bg-crm-dark text-crm-text antialiased;
     font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
@@ -20,7 +44,7 @@
   }
   
   .glass-input {
-    @apply bg-crm-dark/50 border border-crm-border rounded-lg px-4 py-2 text-white placeholder-crm-textMuted focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-transparent transition-all duration-200;
+    @apply bg-crm-dark/50 border border-crm-border rounded-lg px-4 py-2 text-crm-text placeholder-crm-textMuted focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-transparent transition-all duration-200;
   }
   
   .glass-button {
@@ -28,7 +52,7 @@
   }
   
   .glass-button-secondary {
-    @apply bg-crm-darker/50 hover:bg-crm-border border border-crm-border text-white px-4 py-2 rounded-lg font-medium transition-colors duration-200 flex items-center justify-center gap-2;
+    @apply bg-crm-darker/50 hover:bg-crm-border border border-crm-border text-crm-text px-4 py-2 rounded-lg font-medium transition-colors duration-200 flex items-center justify-center gap-2;
   }
   
   .glass-button-danger {
@@ -290,4 +314,9 @@
   height: 1rem;
   accent-color: #3b82f6;
   cursor: pointer;
+}
+
+/* Global Light Theme Text Visibility Fixes */
+.light-theme .text-white:not(.login-page *):not(.register-page *):not(.glass-button):not(.glass-button *):not(.bg-crm-primary):not(.bg-crm-primary *):not(.bg-crm-accent):not(.bg-crm-accent *):not([class*="bg-violet"]):not([class*="bg-violet"] *):not([class*="bg-indigo"]):not([class*="bg-indigo"] *):not([class*="bg-emerald"]):not([class*="bg-emerald"] *):not([class*="bg-rose"]):not([class*="bg-rose"] *):not([class*="from-crm-"]):not([class*="from-crm-"] *) {
+  color: rgb(var(--color-text)) !important;
 }

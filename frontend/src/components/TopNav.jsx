@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { useAuth } from '../hooks/useAuth';
 import { resolveMediaUrl } from '../utils/mediaUrl';
 import NotificationBell from './NotificationBell';
+import { ThemeToggle } from './ThemeToggle';
 
 export const TopNav = ({ onMenuClick }) => {
   const { user, logout } = useAuth();
@@ -21,17 +22,11 @@ export const TopNav = ({ onMenuClick }) => {
           <Menu size={20} />
         </button>
 
-        <div className="hidden md:flex items-center relative">
-          <Search className="absolute left-3 text-crm-textMuted" size={18} />
-          <input
-            type="text"
-            placeholder="Search campaigns, clients..."
-            className="glass-input pl-10 w-64 lg:w-96 rounded-full bg-crm-darker/50"
-          />
-        </div>
+
       </div>
 
       <div className="flex items-center gap-4">
+        <ThemeToggle />
         <NotificationBell />
 
         <div className="relative">
@@ -40,7 +35,7 @@ export const TopNav = ({ onMenuClick }) => {
             className="flex items-center gap-3 p-1 pl-3 pr-1 rounded-full border border-crm-border hover:border-crm-primary/50 transition-colors bg-crm-darker/30"
           >
             <div className="flex flex-col items-end hidden sm:flex">
-              <span className="text-sm font-medium text-white">{user?.name || 'User'}</span>
+              <span className="text-sm font-medium text-crm-text">{user?.name || 'User'}</span>
               <span className="text-xs text-crm-textMuted">{user?.role || 'Guest'}</span>
             </div>
             {avatarUrl ? (
@@ -55,7 +50,7 @@ export const TopNav = ({ onMenuClick }) => {
           {showProfileMenu && (
             <div className="absolute right-0 mt-2 w-48 rounded-xl bg-crm-card border border-crm-border shadow-xl py-1 z-50">
               <div className="px-4 py-2 border-b border-crm-border mb-1 sm:hidden">
-                <p className="text-sm font-medium text-white">{user?.name}</p>
+                <p className="text-sm font-medium text-crm-text">{user?.name}</p>
                 <p className="text-xs text-crm-textMuted">{user?.role}</p>
               </div>
               <button
@@ -63,7 +58,7 @@ export const TopNav = ({ onMenuClick }) => {
                   setShowProfileMenu(false);
                   navigate('/settings');
                 }}
-                className="w-full text-left px-4 py-2 text-sm text-crm-textMuted hover:text-white hover:bg-crm-border/30 flex items-center gap-2 transition-colors"
+                className="w-full text-left px-4 py-2 text-sm text-crm-textMuted hover:text-crm-text hover:bg-crm-border/30 flex items-center gap-2 transition-colors"
               >
                 <Settings size={16} />
                 Settings

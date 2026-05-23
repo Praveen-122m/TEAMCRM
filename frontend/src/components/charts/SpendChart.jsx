@@ -23,7 +23,7 @@ export const SpendChart = ({ data = defaultData }) => {
   return (
     <div className="glass-panel p-6 h-96">
       <div className="mb-6">
-        <h3 className="text-lg font-semibold text-white">Ad Spend Overview</h3>
+        <h3 className="text-lg font-semibold text-crm-text">Ad Spend Overview</h3>
         <p className="text-sm text-crm-textMuted">Last 7 days performance</p>
       </div>
       

@@ -5,8 +5,18 @@ import { clientService } from '../services/clientService';
 import { StatCard } from '../components/StatCard';
 import { SpendChart } from '../components/charts/SpendChart';
 import { LeadsChart } from '../components/charts/LeadsChart';
-import MetaClientNav from '../components/MetaClientNav';
-import { DollarSign, Target, MousePointerClick, Zap, RefreshCw } from 'lucide-react';
+import { 
+  DollarSign, 
+  MousePointerClick, 
+  Link as LinkIcon, 
+  Eye, 
+  Globe, 
+  ShoppingBag, 
+  Target, 
+  MessageSquare, 
+  Instagram, 
+  RefreshCw 
+} from 'lucide-react';
 import toast from 'react-hot-toast';
 
 const MetaAdsDashboard = ({ embedded = false, workspaceId: propWorkspaceId, fixedClientId, clientLabel }) => {
@@ -16,10 +26,12 @@ const MetaAdsDashboard = ({ embedded = false, workspaceId: propWorkspaceId, fixe
   const [analytics, setAnalytics] = useState(null);
   const [loading, setLoading] = useState(true);
   const [clientsLoading, setClientsLoading] = useState(true);
-  const [spendData, setSpendData] = useState([]);
-  const [leadsData, setLeadsData] = useState([]);
+  const [timelineData, setTimelineData] = useState([]);
   const [clients, setClients] = useState([]);
   const [selectedClient, setSelectedClient] = useState('');
+  const [dateRangeOption, setDateRangeOption] = useState('30'); // '7', '30', 'custom'
+  const [customStartDate, setCustomStartDate] = useState('');
+  const [customEndDate, setCustomEndDate] = useState('');
 
   const fetchClients = useCallback(async () => {
     if (fixedClientId) {
@@ -35,13 +47,14 @@ const MetaAdsDashboard = ({ embedded = false, workspaceId: propWorkspaceId, fixe
     if (user.role === 'Admin' || user.role === 'Member') {
       setClientsLoading(true);
       try {
-        const res = await clientService.getClients(wsId || undefined);
+        const res = await clientService.getClients(user.role === 'Admin' ? undefined : wsId);
         const list = res.data || [];
         setClients(list);
         if (list.length > 0) {
           setSelectedClient((prev) => prev || list[0]._id);
         }
-      } catch {
+      } catch (err) {
+        console.error('Failed to load clients:', err);
         toast.error('Failed to load clients');
       } finally {
         setClientsLoading(false);
@@ -58,69 +71,81 @@ const MetaAdsDashboard = ({ embedded = false, workspaceId: propWorkspaceId, fixe
       setLoading(false);
       return;
     }
+
+    let startStr = '';
+    let endStr = new Date().toISOString().split('T')[0];
+
+    if (dateRangeOption === '7') {
+      startStr = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    } else if (dateRangeOption === '30') {
+      startStr = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString().split('T')[0];
+    } else if (dateRangeOption === 'custom') {
+      if (!customStartDate || !customEndDate) {
+        setLoading(false);
+        return; // wait for both custom dates
+      }
+      startStr = customStartDate;
+      endStr = customEndDate;
+    }
+
     setLoading(true);
     try {
-      const urlParams = new URLSearchParams(window.location.search);
-      if (urlParams.get('success') === 'connected') {
-        toast.success('Meta Ads connected');
-      }
-
-      try {
-        await metaService.syncCampaigns(selectedClient, wsId);
-        await metaService.syncLeads(selectedClient, wsId);
-      } catch {
-        /* mock sync may still work */
-      }
-
-      const res = await metaService.getAnalytics(selectedClient);
+      const res = await metaService.getAnalytics(selectedClient, startStr, endStr);
       const data = res.data;
+      
       setAnalytics({
         totalSpend: data.totalSpend || 0,
-        totalConversions: data.totalConversions || 0,
         totalClicks: data.totalClicks || 0,
-        ctr: data.ctr || 0,
-        roas: data.roas || 0,
+        totalLinkClicks: data.totalLinkClicks || 0,
+        totalImpressions: data.totalImpressions || 0,
+        totalLandingPageViews: data.totalLandingPageViews || 0,
+        totalInstagramFollowers: data.totalInstagramFollowers || 0,
+        totalPurchases: data.totalPurchases || 0,
+        totalLeads: data.totalLeads || 0,
+        totalMessagingConversationsStarted: data.totalMessagingConversationsStarted || 0,
       });
 
-      const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-      const mult = selectedClient.charCodeAt(0) % 4 + 1;
-      setSpendData(
-        days.map((date) => ({
-          date,
-          spend: Math.round(((data.totalSpend || 1000) / 7) * (0.7 + Math.random() * 0.6 * mult)),
-        }))
-      );
-      setLeadsData(
-        days.map((date) => ({
-          date,
-          leads: Math.round(((data.totalConversions || 40) / 7) * (0.6 + Math.random() * 0.8)),
-        }))
-      );
+      const timeline = data.dailyTimeline || [];
+      const formattedTimeline = timeline.map(t => ({
+        ...t,
+        date: new Date(t.date).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+      }));
+
+      setTimelineData(formattedTimeline);
       setIsConnected(true);
-    } catch {
-      setAnalytics({ totalSpend: 0, totalConversions: 0, totalClicks: 0, ctr: 0, roas: 0 });
+    } catch (err) {
+      console.error('Failed to load client analytics:', err);
+      setAnalytics({
+        totalSpend: 0,
+        totalClicks: 0,
+        totalLinkClicks: 0,
+        totalImpressions: 0,
+        totalLandingPageViews: 0,
+        totalInstagramFollowers: 0,
+        totalPurchases: 0,
+        totalLeads: 0,
+        totalMessagingConversationsStarted: 0,
+      });
+      setTimelineData([]);
     } finally {
       setLoading(false);
     }
-  }, [selectedClient, wsId]);
+  }, [selectedClient, dateRangeOption, customStartDate, customEndDate]);
 
   useEffect(() => {
     loadClientAnalytics();
   }, [loadClientAnalytics]);
 
-  const handleConnect = () => {
-    window.location.href = metaService.getAuthUrl(selectedClient || 'demo', wsId);
-  };
-
   const handleSync = async () => {
     if (!selectedClient) return toast.error('Select a client first');
+    const toastId = toast.loading('Syncing latest data from Meta Ads...');
     try {
       await metaService.syncCampaigns(selectedClient, wsId);
-      await metaService.syncLeads(selectedClient, wsId);
-      toast.success('Synced campaigns & leads');
+      toast.success('Campaigns and insights synced successfully!', { id: toastId });
       loadClientAnalytics();
-    } catch {
-      toast.error('Sync failed');
+    } catch (err) {
+      console.error('Sync failed:', err);
+      toast.error('Sync failed: ' + (err.response?.data?.message || err.message), { id: toastId });
     }
   };
 
@@ -128,36 +153,38 @@ const MetaAdsDashboard = ({ embedded = false, workspaceId: propWorkspaceId, fixe
 
   if (!embedded && !fixedClientId && (user.role === 'Admin' || user.role === 'Member')) {
     return (
-      <div className="space-y-0">
-        <MetaClientNav
-          clients={clients}
-          selectedClient={selectedClient}
-          onSelect={setSelectedClient}
-          loading={clientsLoading}
-        />
-
-        {!selectedClient ? (
-          <div className="glass-panel p-12 text-center text-crm-textMuted">
-            Select a client above to view their Meta Ads performance.
+      <div className="space-y-6">
+        {!selectedClient && !clientsLoading && clients.length === 0 ? (
+          <div className="glass-panel p-12 text-center text-crm-textMuted mt-6">
+            No clients found. Add clients from the Client Workspaces page first.
+          </div>
+        ) : !selectedClient ? (
+          <div className="glass-panel p-12 text-center text-crm-textMuted mt-6">
+            Select a client to view their Meta Ads performance.
           </div>
         ) : loading ? (
           <div className="flex justify-center py-20">
             <div className="animate-spin h-10 w-10 border-t-2 border-crm-primary rounded-full" />
           </div>
-        ) : !isConnected ? (
-          <div className="glass-panel p-12 text-center">
-            <button type="button" onClick={handleConnect} className="glass-button">
-              Connect Meta Account
-            </button>
-          </div>
         ) : (
           <DashboardBody
             clientLabel={selectedClientData?.companyName || selectedClientData?.name}
             analytics={analytics}
-            spendData={spendData}
-            leadsData={leadsData}
+            timelineData={timelineData}
             client={selectedClientData}
             onSync={handleSync}
+            clients={clients}
+            selectedClient={selectedClient}
+            onSelectClient={setSelectedClient}
+            clientsLoading={clientsLoading}
+            embedded={embedded}
+            fixedClientId={fixedClientId}
+            dateRangeOption={dateRangeOption}
+            setDateRangeOption={setDateRangeOption}
+            customStartDate={customStartDate}
+            setCustomStartDate={setCustomStartDate}
+            customEndDate={customEndDate}
+            setCustomEndDate={setCustomEndDate}
           />
         )}
       </div>
@@ -176,63 +203,186 @@ const MetaAdsDashboard = ({ embedded = false, workspaceId: propWorkspaceId, fixe
     <DashboardBody
       clientLabel={clientLabel}
       analytics={analytics}
-      spendData={spendData}
-      leadsData={leadsData}
+      timelineData={timelineData}
       client={selectedClientData}
       onSync={handleSync}
       embedded={embedded}
+      dateRangeOption={dateRangeOption}
+      setDateRangeOption={setDateRangeOption}
+      customStartDate={customStartDate}
+      setCustomStartDate={setCustomStartDate}
+      customEndDate={customEndDate}
+      setCustomEndDate={setCustomEndDate}
     />
   );
 };
 
-const DashboardBody = ({ clientLabel, analytics, spendData, leadsData, client, onSync, embedded }) => (
+const DashboardBody = ({ 
+  clientLabel, 
+  analytics, 
+  timelineData, 
+  client, 
+  onSync, 
+  embedded, 
+  clients, 
+  selectedClient, 
+  onSelectClient, 
+  clientsLoading, 
+  fixedClientId,
+  dateRangeOption,
+  setDateRangeOption,
+  customStartDate,
+  setCustomStartDate,
+  customEndDate,
+  setCustomEndDate
+}) => (
   <div className="space-y-6">
-    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-end gap-4">
+    <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
       <div>
-        <h1 className="text-3xl font-bold text-white tracking-tight">
+        <h1 className="text-3xl font-bold text-crm-text tracking-tight">
           {clientLabel ? `${clientLabel} — Meta Ads` : 'Meta Ads Analytics'}
         </h1>
-        <p className="text-crm-textMuted text-sm mt-1">Live performance for selected client account.</p>
+        <p className="text-crm-textMuted text-sm mt-1">Real-time performance analytics for selected client integration.</p>
       </div>
-      <button type="button" onClick={onSync} className="glass-button-secondary">
-        <RefreshCw size={16} /> Sync Data
-      </button>
+      <div className="flex flex-wrap items-center gap-3">
+        {!embedded && !fixedClientId && clients && clients.length > 0 && (
+          <select
+            value={selectedClient}
+            onChange={(e) => onSelectClient && onSelectClient(e.target.value)}
+            className="glass-input cursor-pointer min-w-[200px] text-sm bg-crm-darker/90 font-medium"
+            disabled={clientsLoading}
+          >
+            <option value="" disabled>Select client...</option>
+            {clients.map((c) => (
+              <option key={c._id} value={c._id}>
+                {c.companyName || c.name}
+              </option>
+            ))}
+          </select>
+        )}
+        
+        {/* Date Range Selector Dropdown */}
+        <select
+          value={dateRangeOption}
+          onChange={(e) => setDateRangeOption(e.target.value)}
+          className="glass-input cursor-pointer text-sm bg-crm-darker/90 font-medium min-w-[130px]"
+        >
+          <option value="7">Last 7 Days</option>
+          <option value="30">Last 30 Days</option>
+          <option value="custom">Custom Range</option>
+        </select>
+
+        {/* Custom Date Pickers */}
+        {dateRangeOption === 'custom' && (
+          <div className="flex items-center gap-2 bg-crm-darker/30 p-1 rounded-lg border border-crm-primary/10">
+            <input
+              type="date"
+              value={customStartDate}
+              onChange={(e) => setCustomStartDate(e.target.value)}
+              className="glass-input text-sm text-crm-text bg-crm-darker/90 py-1.5 px-2.5 max-w-[130px]"
+            />
+            <span className="text-crm-textMuted text-xs">to</span>
+            <input
+              type="date"
+              value={customEndDate}
+              onChange={(e) => setCustomEndDate(e.target.value)}
+              className="glass-input text-sm text-crm-text bg-crm-darker/90 py-1.5 px-2.5 max-w-[130px]"
+            />
+          </div>
+        )}
+
+        <button type="button" onClick={onSync} className="glass-button flex items-center gap-2 py-2.5 text-sm">
+          <RefreshCw size={16} /> Sync Live Data
+        </button>
+      </div>
     </div>
 
     {client && (
-      <div className="glass-panel p-5 border border-crm-primary/20">
-        <h3 className="text-lg font-bold text-white mb-3">{client.companyName || client.name}</h3>
+      <div className="glass-panel p-5 border border-crm-primary/20 bg-crm-darker/30">
+        <h3 className="text-lg font-bold text-crm-text mb-3">{client.companyName || client.name}</h3>
         <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 text-sm">
           <div>
             <p className="text-crm-textMuted text-xs">Contact</p>
-            <p className="text-white font-medium">{client.name}</p>
+            <p className="text-crm-text font-medium">{client.name}</p>
           </div>
           <div>
             <p className="text-crm-textMuted text-xs">Email</p>
-            <p className="text-white font-medium truncate">{client.email}</p>
+            <p className="text-crm-text font-medium truncate">{client.email}</p>
           </div>
           <div>
-            <p className="text-crm-textMuted text-xs">Industry</p>
-            <p className="text-white font-medium">{client.industry || '—'}</p>
+            <p className="text-crm-textMuted text-xs">Client ID</p>
+            <p className="text-crm-text font-mono text-xs truncate">{client._id}</p>
           </div>
           <div>
-            <p className="text-crm-textMuted text-xs">Budget</p>
-            <p className="text-emerald-400 font-medium">${(client.monthlyBudget || 0).toLocaleString()}</p>
+            <p className="text-crm-textMuted text-xs">Secret Key</p>
+            <p className="text-emerald-400 font-mono font-medium">{client.secretCode || '—'}</p>
           </div>
         </div>
       </div>
     )}
 
-    <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
-      <StatCard title="Total Ad Spend" value={`$${(analytics?.totalSpend || 0).toLocaleString()}`} icon={DollarSign} color="amber" />
-      <StatCard title="Conversions" value={(analytics?.totalConversions || 0).toLocaleString()} icon={Target} color="emerald" />
-      <StatCard title="Link Clicks" value={(analytics?.totalClicks || 0).toLocaleString()} icon={MousePointerClick} color="primary" />
-      <StatCard title="ROAS" value={`${analytics?.roas || 0}x`} icon={Zap} color="violet" />
+    {/* Metric Cards Grid */}
+    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+      <StatCard 
+        title="Total Ad Spend" 
+        value={`$${(analytics?.totalSpend || 0).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}`} 
+        icon={DollarSign} 
+        color="amber" 
+      />
+      <StatCard 
+        title="Total Clicks" 
+        value={(analytics?.totalClicks || 0).toLocaleString()} 
+        icon={MousePointerClick} 
+        color="primary" 
+      />
+      <StatCard 
+        title="Link Clicks" 
+        value={(analytics?.totalLinkClicks || 0).toLocaleString()} 
+        icon={LinkIcon} 
+        color="violet" 
+      />
+      <StatCard 
+        title="Impressions" 
+        value={(analytics?.totalImpressions || 0).toLocaleString()} 
+        icon={Eye} 
+        color="indigo" 
+      />
+      <StatCard 
+        title="Landing Page Views" 
+        value={(analytics?.totalLandingPageViews || 0).toLocaleString()} 
+        icon={Globe} 
+        color="teal" 
+      />
+      <StatCard 
+        title="Purchases" 
+        value={(analytics?.totalPurchases || 0).toLocaleString()} 
+        icon={ShoppingBag} 
+        color="rose" 
+      />
+      <StatCard 
+        title="Leads" 
+        value={(analytics?.totalLeads || 0).toLocaleString()} 
+        icon={Target} 
+        color="emerald" 
+      />
+      <StatCard 
+        title="Conversations Started" 
+        value={(analytics?.totalMessagingConversationsStarted || 0).toLocaleString()} 
+        icon={MessageSquare} 
+        color="cyan" 
+      />
+      <StatCard 
+        title="Instagram Followers" 
+        value={(analytics?.totalInstagramFollowers || 0).toLocaleString()} 
+        icon={Instagram} 
+        color="pink" 
+      />
     </div>
 
+    {/* Charts Section */}
     <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-      <SpendChart data={spendData} />
-      <LeadsChart data={leadsData} />
+      <SpendChart data={timelineData} />
+      <LeadsChart data={timelineData} />
     </div>
   </div>
 );

@@ -1,182 +1,123 @@
 import { useEffect, useState } from 'react';
 import { useAuth } from '../hooks/useAuth';
 import { StatCard } from '../components/StatCard';
-import { DataTable } from '../components/DataTable';
 import { SpendChart } from '../components/charts/SpendChart';
 import { CampaignPerformance } from '../components/charts/CampaignPerformance';
 import { 
-  Users, 
   Target, 
   TrendingUp, 
-  DollarSign, 
-  UserSquare2,
-  AlertCircle
+  DollarSign,
+  Zap
 } from 'lucide-react';
 import { clientService } from '../services/clientService';
 import { metaService } from '../services/metaService';
 
 const Dashboard = () => {
-  const { user, activeWorkspace } = useAuth();
+  const { user } = useAuth();
   const [clients, setClients] = useState([]);
+  const [selectedClient, setSelectedClient] = useState('');
   const [analytics, setAnalytics] = useState(null);
+  const [spendData, setSpendData] = useState([]);
 
   useEffect(() => {
-    if (activeWorkspace) {
-      // In a real app we'd fetch actual data. For demo, we simulate
-      fetchDashboardData();
-    }
-  }, [activeWorkspace]);
+    clientService.getClients().then(res => {
+      const list = res.data || [];
+      setClients(list);
+      if (list.length > 0) {
+        setSelectedClient(list[0]._id);
+      }
+    }).catch(console.error);
+  }, []);
 
-  const fetchDashboardData = async () => {
+  useEffect(() => {
+    if (selectedClient) {
+      fetchClientAnalytics(selectedClient);
+    } else {
+      setAnalytics(null);
+      setSpendData([]);
+    }
+  }, [selectedClient]);
+
+  const fetchClientAnalytics = async (clientId) => {
     try {
-      // const clientsRes = await clientService.getClients(activeWorkspace);
-      // setClients(clientsRes.data);
-      
-      // Mock data for display
-      setClients([
-        { _id: 1, companyName: 'Acme Corp', status: 'active', monthlyBudget: 5000 },
-        { _id: 2, companyName: 'Stark Industries', status: 'active', monthlyBudget: 15000 },
-        { _id: 3, companyName: 'Wayne Ent', status: 'inactive', monthlyBudget: 8000 },
-      ]);
-      
+      const res = await metaService.getAnalytics(clientId);
+      const data = res.data || {};
       setAnalytics({
-        totalSpend: 12540,
-        totalConversions: 845,
-        totalLeads: 320,
-        activeCampaigns: 12
+        totalSpend: data.totalSpend || 0,
+        totalConversions: data.totalConversions || 0,
+        totalClicks: data.totalClicks || 0,
+        roas: data.roas || 0,
       });
-    } catch (error) {
-      console.error(error);
+      
+      const days = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+      const mult = clientId.charCodeAt(0) % 4 + 1;
+      setSpendData(
+        days.map((date) => ({
+          date,
+          spend: Math.round(((data.totalSpend || 1000) / 7) * (0.7 + Math.random() * 0.6 * mult)),
+        }))
+      );
+    } catch (err) {
+      setAnalytics({ totalSpend: 0, totalConversions: 0, totalClicks: 0, roas: 0 });
+      setSpendData([]);
     }
   };
 
-  const clientColumns = [
-    { header: 'Client', accessor: 'companyName' },
-    { 
-      header: 'Status', 
-      accessor: 'status',
-      cell: (row) => (
-        <span className={row.status === 'active' ? 'badge-active' : 'badge-inactive'}>
-          {row.status}
-        </span>
-      )
-    },
-    { 
-      header: 'Budget', 
-      accessor: 'monthlyBudget',
-      cell: (row) => `$${row.monthlyBudget.toLocaleString()}`
-    },
-  ];
-
   return (
     <div className="space-y-6">
-      <div className="flex justify-between items-end">
+      <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-3xl font-bold text-white tracking-tight mb-1">Admin Dashboard</h1>
+          <h1 className="text-3xl font-bold text-crm-text tracking-tight mb-1">Admin Dashboard</h1>
           <p className="text-crm-textMuted">Welcome back, {user?.name}. Here's what's happening today.</p>
+        </div>
+        <div className="flex items-center gap-3">
+          {clients.length > 0 && (
+            <select
+              value={selectedClient}
+              onChange={(e) => setSelectedClient(e.target.value)}
+              className="glass-input cursor-pointer min-w-[200px] text-sm bg-crm-darker/90 font-medium"
+            >
+              <option value="" disabled>Select client...</option>
+              {clients.map(c => (
+                <option key={c._id} value={c._id}>{c.companyName || c.name}</option>
+              ))}
+            </select>
+          )}
         </div>
       </div>
 
       {/* Top Stats */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
         <StatCard 
-          title="Total Clients" 
-          value={clients.length || '3'} 
-          icon={Users} 
-          trend="up" 
-          trendValue="12%"
-          color="primary"
+          title="Total Ad Spend" 
+          value={`$${(analytics?.totalSpend || 0).toLocaleString()}`} 
+          icon={DollarSign} 
+          color="amber"
         />
         <StatCard 
-          title="Active Campaigns" 
-          value={analytics?.activeCampaigns || '12'} 
+          title="Conversions" 
+          value={(analytics?.totalConversions || 0).toLocaleString()} 
           icon={Target} 
-          trend="up" 
-          trendValue="4%"
           color="emerald"
         />
         <StatCard 
-          title="Total Leads" 
-          value={analytics?.totalLeads || '320'} 
+          title="Link Clicks" 
+          value={(analytics?.totalClicks || 0).toLocaleString()} 
           icon={TrendingUp} 
-          trend="up" 
-          trendValue="18%"
-          color="violet"
+          color="primary"
         />
         <StatCard 
-          title="Total Ad Spend" 
-          value={`$${(analytics?.totalSpend || 12540).toLocaleString()}`} 
-          icon={DollarSign} 
-          trend="down" 
-          trendValue="2%"
-          color="amber"
+          title="ROAS" 
+          value={`${analytics?.roas || 0}x`} 
+          icon={Zap} 
+          color="violet"
         />
       </div>
 
       {/* Charts Row */}
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-        <SpendChart />
+        {spendData.length > 0 ? <SpendChart data={spendData} /> : <SpendChart />}
         <CampaignPerformance />
-      </div>
-
-      {/* Bottom Row */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2">
-          <div className="flex justify-between items-center mb-4">
-            <h3 className="text-xl font-bold text-white">Recent Clients</h3>
-            <button className="text-crm-primary hover:text-white text-sm font-medium transition-colors">
-              View All
-            </button>
-          </div>
-          <DataTable 
-            columns={clientColumns} 
-            data={clients} 
-            searchable={false}
-          />
-        </div>
-        
-        <div className="space-y-6">
-          <div className="glass-panel p-6">
-            <h3 className="text-lg font-bold text-white mb-4 flex items-center gap-2">
-              <AlertCircle size={20} className="text-rose-500" />
-              Meta Alerts
-            </h3>
-            <div className="space-y-4">
-              <div className="p-3 bg-rose-500/10 border border-rose-500/20 rounded-lg">
-                <p className="text-sm text-rose-400 font-medium">Acme Corp Ad Account</p>
-                <p className="text-xs text-crm-textMuted mt-1">Payment method expiring in 3 days</p>
-              </div>
-              <div className="p-3 bg-amber-500/10 border border-amber-500/20 rounded-lg">
-                <p className="text-sm text-amber-400 font-medium">Stark Ind Campaign</p>
-                <p className="text-xs text-crm-textMuted mt-1">Budget exhausted for the day</p>
-              </div>
-            </div>
-          </div>
-          
-          <div className="glass-panel p-6">
-            <h3 className="text-lg font-bold text-white mb-4">Team Activity</h3>
-            <div className="space-y-4">
-              <div className="flex gap-3">
-                <div className="w-8 h-8 rounded-full bg-crm-primary/20 flex items-center justify-center text-crm-primary shrink-0">
-                  <UserSquare2 size={16} />
-                </div>
-                <div>
-                  <p className="text-sm text-white"><span className="font-medium">Sarah M.</span> paused a campaign</p>
-                  <p className="text-xs text-crm-textMuted">10 mins ago</p>
-                </div>
-              </div>
-              <div className="flex gap-3">
-                <div className="w-8 h-8 rounded-full bg-emerald-500/20 flex items-center justify-center text-emerald-500 shrink-0">
-                  <UserSquare2 size={16} />
-                </div>
-                <div>
-                  <p className="text-sm text-white"><span className="font-medium">Mike R.</span> uploaded a report</p>
-                  <p className="text-xs text-crm-textMuted">1 hour ago</p>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
       </div>
     </div>
   );

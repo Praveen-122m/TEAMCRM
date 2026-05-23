@@ -1,15 +1,15 @@
 const express = require('express');
 const router = express.Router();
 const { searchUsers, updateProfile, getAdminStats, getProfile, updateSettings, changePassword } = require('../controllers/userController');
-const { protect } = require('../middleware/authMiddleware');
+const { protect, admin } = require('../middleware/authMiddleware');
 
 router.get('/profile', protect, getProfile);
 router.get('/search', protect, searchUsers);
 router.put('/profile', protect, updateProfile);
 router.put('/settings', protect, updateSettings);
 router.put('/change-password', protect, changePassword);
-router.get('/admin/stats', protect, getAdminStats);
-router.delete('/:id', protect, async (req, res) => {
+router.get('/admin/stats', protect, admin, getAdminStats);
+router.delete('/:id', protect, admin, async (req, res) => {
   try {
     const User = require('../models/User');
     const user = await User.findByPk(req.params.id);

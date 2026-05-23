@@ -84,46 +84,26 @@ const createClient = async (req, res) => {
  */
 const getClients = async (req, res) => {
   try {
-    const { workspaceId } = req.query;
+    const SaaSClient = require('../models/SaaSClient');
+    let clientsList;
     
-    let clientUsers;
-    if (workspaceId) {
-      const workspace = await Workspace.findByPk(workspaceId);
-      if (!workspace) return res.status(404).json({ message: 'Workspace not found' });
-      clientUsers = await workspace.getMembers({ where: { role: 'Client' } });
+    if (req.user.role === 'Client') {
+      clientsList = await SaaSClient.findAll({ where: { id: req.user.id } });
     } else {
-      clientUsers = await User.findAll({ where: { role: 'Client' } });
+      clientsList = await SaaSClient.findAll();
     }
 
-    // Get client profiles for these users
-    const clients = await Promise.all(clientUsers.map(async (u) => {
-      const clientProfile = await Client.findOne({ where: { userId: u._id } });
-      const assignments = await ClientAssignment.findAll({
-        where: { clientId: clientProfile?._id },
-        include: [{ model: Member, as: 'member', include: [{ model: User, as: 'user', attributes: ['_id', 'name', 'email', 'profileImage'] }] }]
-      });
-      
-      return {
-        _id: clientProfile?._id || u._id,
-        userId: u._id,
-        name: u.name,
-        email: u.email,
-        profileImage: u.profileImage,
-        companyName: clientProfile?.companyName || '',
-        industry: clientProfile?.industry || '',
-        contactPerson: clientProfile?.contactPerson || '',
-        phone: clientProfile?.phone || '',
-        website: clientProfile?.website || '',
-        monthlyBudget: clientProfile?.monthlyBudget || 0,
-        status: clientProfile?.status || 'active',
-        notes: clientProfile?.notes || '',
-        assignedMembers: assignments.map(a => ({
-          _id: a._id,
-          role: a.role,
-          member: a.member?.user || null
-        })),
-        createdAt: clientProfile?.createdAt || u.createdAt
-      };
+    const clients = clientsList.map(c => ({
+      _id: c.id,
+      userId: c.id,
+      name: c.client_name,
+      email: c.email,
+      companyName: c.company_name,
+      description: c.description,
+      status: 'active',
+      secretCode: c.secret_key,
+      role: c.role,
+      createdAt: c.createdAt
     }));
 
     res.json(clients);
@@ -139,11 +119,23 @@ const getClients = async (req, res) => {
  */
 const getClientById = async (req, res) => {
   try {
-    const client = await Client.findByPk(req.params.id, {
-      include: [{ model: User, as: 'user', attributes: ['_id', 'name', 'email', 'profileImage', 'role'] }]
-    });
+    const SaaSClient = require('../models/SaaSClient');
+    const client = await SaaSClient.findByPk(req.params.id);
     if (!client) return res.status(404).json({ message: 'Client not found' });
-    res.json(client);
+    
+    res.json({
+      _id: client.id,
+      userId: client.id,
+      companyName: client.company_name,
+      contactPerson: client.client_name,
+      client_name: client.client_name,
+      email: client.email,
+      description: client.description,
+      status: 'active',
+      secretCode: client.secret_key,
+      role: client.role,
+      createdAt: client.createdAt
+    });
   } catch (error) {
     console.error('[GET_CLIENT_ERR]', error);
     res.status(500).json({ message: 'Server Error' });

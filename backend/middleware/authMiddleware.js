@@ -1,5 +1,6 @@
 const jwt = require('jsonwebtoken');
 const User = require('../models/User');
+const SaaSClient = require('../models/SaaSClient');
 
 /**
  * Verify JWT Token - Base authentication middleware
@@ -15,17 +16,36 @@ const verifyToken = async (req, res, next) => {
       token = req.headers.authorization.split(' ')[1];
       const decoded = jwt.verify(token, process.env.JWT_SECRET);
 
-      req.user = await User.findByPk(decoded.id, {
+      // Try searching standard User first
+      let resolvedUser = await User.findByPk(decoded.id, {
         attributes: { exclude: ['password'] }
       });
 
-      if (!req.user) {
-        return res.status(401).json({ message: 'Not authorized, user no longer exists' });
-      }
+      if (resolvedUser) {
+        // Attach workspace list
+        const workspaces = await resolvedUser.getWorkspaces({ attributes: ['_id'] });
+        resolvedUser.workspaces = workspaces.map(w => w._id);
+        req.user = resolvedUser;
+      } else {
+        // Try searching client from the clients table
+        const saasClient = await SaaSClient.findByPk(decoded.id);
+        if (!saasClient) {
+          return res.status(401).json({ message: 'Not authorized, user no longer exists' });
+        }
 
-      // Attach workspace list
-      const workspaces = await req.user.getWorkspaces({ attributes: ['_id'] });
-      req.user.workspaces = workspaces.map(w => w._id);
+        // Mock req.user format for compatibility
+        req.user = {
+          _id: saasClient.id,
+          id: saasClient.id,
+          name: saasClient.client_name,
+          email: saasClient.email,
+          role: 'Client',
+          companyName: saasClient.company_name,
+          secretKey: saasClient.secret_key,
+          description: saasClient.description,
+          workspaces: saasClient.workspace_id ? [saasClient.workspace_id] : []
+        };
+      }
 
       next();
     } catch (error) {

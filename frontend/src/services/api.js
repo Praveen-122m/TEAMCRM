@@ -23,11 +23,18 @@ api.interceptors.response.use(
   (response) => response,
   (error) => {
     const status = error.response?.status;
-    if (status === 401) {
+    const url = error.config?.url;
+    
+    // Do not redirect if it's the login endpoint returning 401 (e.g. wrong password)
+    if (status === 401 && url && !url.includes('/auth/login')) {
       localStorage.removeItem('token');
       localStorage.removeItem('userInfo');
       localStorage.removeItem('activeWorkspace');
-      window.location.href = '/login';
+      
+      // Prevent infinite reload loop if already on login page
+      if (window.location.pathname !== '/login') {
+        window.location.href = '/login';
+      }
     }
     // 429 = rate limit — do not logout; let the UI show the error
     return Promise.reject(error);

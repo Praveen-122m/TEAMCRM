@@ -5,7 +5,7 @@ import { AuthContext } from './AuthContext';
 export const SocketContext = createContext();
 
 const getSocketUrl = () => {
-  const apiUrl = import.meta.env.VITE_API_URL || 'http://localhost:5005/api';
+  const apiUrl = import.meta.env.VITE_API_URL || `http://${window.location.hostname}:5005/api`;
   return apiUrl.replace(/\/api\/?$/, '');
 };
 
@@ -16,6 +16,7 @@ export const SocketProvider = ({ children }) => {
   const [socket, setSocket] = useState(null);
   const [isConnected, setIsConnected] = useState(false);
   const [unreadCounts, setUnreadCounts] = useState({});
+  const [onlineUsers, setOnlineUsers] = useState([]);
   const { user, activeWorkspace } = useContext(AuthContext);
 
   const playNotificationSound = useCallback(() => {
@@ -46,12 +47,16 @@ export const SocketProvider = ({ children }) => {
       return;
     }
 
+    const token = localStorage.getItem('token');
     const newSocket = io(getSocketUrl(), {
       transports: ['websocket', 'polling'],
       reconnection: true,
       reconnectionAttempts: 15,
       reconnectionDelay: 1000,
       withCredentials: true,
+      auth: {
+        token: token,
+      },
     });
 
     newSocket.on('connect', () => {
@@ -65,6 +70,21 @@ export const SocketProvider = ({ children }) => {
 
     newSocket.on('connected', () => {
       console.log('[SOCKET] Setup complete');
+    });
+
+    newSocket.on('get_online_users', (users) => {
+      setOnlineUsers(users || []);
+    });
+
+    newSocket.on('user_online', (userId) => {
+      setOnlineUsers((prev) => {
+        if (prev.includes(userId)) return prev;
+        return [...prev, userId];
+      });
+    });
+
+    newSocket.on('user_offline', (userId) => {
+      setOnlineUsers((prev) => prev.filter((id) => id !== userId));
     });
 
     newSocket.on('message_received', (msg) => {
@@ -163,6 +183,7 @@ export const SocketProvider = ({ children }) => {
       newSocket.disconnect();
       setSocket(null);
       setIsConnected(false);
+      setOnlineUsers([]);
     };
   }, [user?._id, user?.name, user?.role, JSON.stringify(user?.workspaces), setupSocketUser, playNotificationSound]);
 
@@ -185,7 +206,7 @@ export const SocketProvider = ({ children }) => {
   const totalUnread = Object.values(unreadCounts).reduce((a, b) => a + (b.count || 0), 0);
 
   return (
-    <SocketContext.Provider value={{ socket, isConnected, unreadCounts, clearUnread, totalUnread }}>
+    <SocketContext.Provider value={{ socket, isConnected, unreadCounts, clearUnread, totalUnread, onlineUsers }}>
       {children}
     </SocketContext.Provider>
   );

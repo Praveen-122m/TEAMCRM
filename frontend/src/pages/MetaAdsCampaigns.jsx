@@ -46,16 +46,7 @@ const MetaAdsCampaigns = () => {
     { header: 'Spend', accessor: 'spend', cell: (row) => formatCurrency(row.spend) },
     { header: 'Impressions', accessor: 'impressions', cell: (row) => formatNumber(row.impressions) },
     { header: 'CTR', accessor: 'ctr', cell: (row) => `${row.ctr}%` },
-    { header: 'Results', accessor: 'conversions', cell: (row) => <span className="font-bold text-emerald-400">{row.conversions}</span> },
-    {
-      header: 'Actions',
-      sortable: false,
-      cell: (row) => (
-        <button className={`p-2 rounded-lg transition-colors ${row.status === 'active' ? 'bg-rose-500/10 text-rose-400 hover:bg-rose-500/20' : 'bg-emerald-500/10 text-emerald-400 hover:bg-emerald-500/20'}`}>
-          {row.status === 'active' ? <PauseCircle size={18} /> : <PlayCircle size={18} />}
-        </button>
-      )
-    }
+    { header: 'Results', accessor: 'conversions', cell: (row) => <span className="font-bold text-emerald-400">{row.conversions}</span> }
   ];
 
   return (

@@ -22,7 +22,7 @@ export const LeadsChart = ({ data = defaultData }) => {
   return (
     <div className="glass-panel p-6 h-96">
       <div className="mb-6">
-        <h3 className="text-lg font-semibold text-white">Lead Generation</h3>
+        <h3 className="text-lg font-semibold text-crm-text">Lead Generation</h3>
         <p className="text-sm text-crm-textMuted">Volume over time</p>
       </div>
       

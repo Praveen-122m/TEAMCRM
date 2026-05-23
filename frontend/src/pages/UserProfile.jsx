@@ -8,6 +8,7 @@ import SecurityOutlinedIcon from '@mui/icons-material/SecurityOutlined';
 import ColorLensOutlinedIcon from '@mui/icons-material/ColorLensOutlined';
 import IntegrationInstructionsOutlinedIcon from '@mui/icons-material/IntegrationInstructionsOutlined';
 import axios from 'axios';
+import api from '../services/api';
 
 const UserProfile = () => {
   const { user, setUser } = useContext(AuthContext);
@@ -35,7 +36,7 @@ const UserProfile = () => {
     setLoading(true);
     setSuccess(false);
     try {
-      const res = await axios.put('/api/users/profile', formData);
+      const res = await api.put('/users/profile', formData);
       setUser(res.data);
       setSuccess(true);
     } catch (error) {

@@ -15,14 +15,27 @@ const socketHandler = (io) => {
   io.on('connection', (socket) => {
     console.log('[SOCKET] Connected:', socket.id);
 
-    socket.on('setup', (userData) => {
-      if (userData && userData._id) {
-        const userId = userData._id.toString();
+    socket.on('setup', async (userData) => {
+      if (socket.userId) {
+        const userId = socket.userId;
         socket.join(userId);
-        joinUserWorkspaces(socket, userData);
+        
+        try {
+          const User = require('../models/User');
+          const user = await User.findByPk(userId);
+          if (user) {
+            const workspaces = await user.getWorkspaces({ attributes: ['_id'] });
+            const secureUserData = { 
+              workspaces: workspaces.map(w => w._id), 
+              role: user.role 
+            };
+            joinUserWorkspaces(socket, secureUserData);
+          }
+        } catch (err) {
+          console.error('[SOCKET_SETUP_ERR]', err);
+        }
 
         onlineUsers.set(userId, socket.id);
-        socket.userId = userId;
 
         console.log('[SOCKET] User joined private room:', userId);
         socket.broadcast.emit('user_online', userId);
@@ -31,24 +44,49 @@ const socketHandler = (io) => {
       }
     });
 
-    socket.on('join_workspace', (workspaceId) => {
-      if (!workspaceId) return;
-      socket.join(workspaceId.toString());
-      console.log('[SOCKET] User joined workspace room:', workspaceId);
+    socket.on('join_workspace', async (workspaceId) => {
+      if (!workspaceId || !socket.userId) return;
+      try {
+        const Workspace = require('../models/Workspace');
+        const workspace = await Workspace.findByPk(workspaceId);
+        if (workspace && await workspace.hasMember(socket.userId)) {
+          socket.join(workspaceId.toString());
+          console.log('[SOCKET] User joined workspace room:', workspaceId);
+        }
+      } catch (err) {
+        console.error('[SOCKET_JOIN_WS_ERR]', err);
+      }
     });
 
-    socket.on('join_channel', (channelId) => {
-      if (!channelId) return;
-      socket.join(channelId.toString());
-      console.log('[SOCKET] User joined channel:', channelId);
+    socket.on('join_channel', async (channelId) => {
+      if (!channelId || !socket.userId) return;
+      try {
+        const Channel = require('../models/Channel');
+        const channel = await Channel.findByPk(channelId);
+        if (channel && await channel.hasMember(socket.userId)) {
+          socket.join(channelId.toString());
+          console.log('[SOCKET] User joined channel:', channelId);
+        }
+      } catch (err) {
+        console.error('[SOCKET_JOIN_CHANNEL_ERR]', err);
+      }
     });
 
-    socket.on('join_channels', (channelIds) => {
-      if (!Array.isArray(channelIds)) return;
-      channelIds.forEach((channelId) => {
-        if (channelId) socket.join(channelId.toString());
-      });
-      console.log('[SOCKET] User joined channels:', channelIds.length);
+    socket.on('join_channels', async (channelIds) => {
+      if (!Array.isArray(channelIds) || !socket.userId) return;
+      try {
+        const Channel = require('../models/Channel');
+        for (const channelId of channelIds) {
+          if (!channelId) continue;
+          const channel = await Channel.findByPk(channelId);
+          if (channel && await channel.hasMember(socket.userId)) {
+            socket.join(channelId.toString());
+          }
+        }
+        console.log('[SOCKET] User joined channels:', channelIds.length);
+      } catch (err) {
+        console.error('[SOCKET_JOIN_CHANNELS_ERR]', err);
+      }
     });
 
     socket.on('leave_channel', (channelId) => {

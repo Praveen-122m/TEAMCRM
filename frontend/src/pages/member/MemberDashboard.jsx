@@ -44,7 +44,7 @@ const MemberDashboard = () => {
             {(row.client?.companyName || row.client?.name || 'U').charAt(0)}
           </div>
           <div>
-            <p className="font-medium text-white">{row.client?.companyName || row.client?.name}</p>
+            <p className="font-medium text-crm-text">{row.client?.companyName || row.client?.name}</p>
             <p className="text-xs text-crm-textMuted flex items-center gap-1">
               <Briefcase size={12} /> {row.client?.industry || 'N/A'}
             </p>
@@ -56,15 +56,6 @@ const MemberDashboard = () => {
       header: 'Your Role', 
       accessor: 'role',
       cell: (row) => <span className="badge-warning">{row.role}</span>
-    },
-    { 
-      header: 'Status', 
-      accessor: (row) => row.client?.status,
-      cell: (row) => (
-        <span className={row.client?.status === 'active' ? 'badge-active' : 'badge-inactive'}>
-          {row.client?.status || 'Unknown'}
-        </span>
-      )
     }
   ];
 
@@ -72,38 +63,9 @@ const MemberDashboard = () => {
     <div className="space-y-6">
       <div className="flex justify-between items-end">
         <div>
-          <h1 className="text-3xl font-bold text-white tracking-tight mb-1">Your Dashboard</h1>
+          <h1 className="text-3xl font-bold text-crm-text tracking-tight mb-1">Your Dashboard</h1>
           <p className="text-crm-textMuted">Welcome back, {user?.name}. Here are your active assignments.</p>
         </div>
-      </div>
-
-      {/* Top Stats */}
-      <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-6">
-        <StatCard 
-          title="Assigned Clients" 
-          value={assignedClients.length} 
-          icon={Users} 
-          color="primary"
-        />
-        <StatCard 
-          title="Active Campaigns" 
-          value="8" 
-          icon={Target} 
-          color="emerald"
-        />
-        <StatCard 
-          title="Today's Leads" 
-          value="24" 
-          icon={ListTodo} 
-          color="amber"
-        />
-        <StatCard 
-          title="Team Chat" 
-          value="Live" 
-          icon={MessageSquare} 
-          color="violet"
-          onClick={() => navigate('/channels')}
-        />
       </div>
 
       <JoinWorkspaceCard />
@@ -111,38 +73,37 @@ const MemberDashboard = () => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         <div className="lg:col-span-2 space-y-6">
           <div>
-            <h3 className="text-xl font-bold text-white mb-4">Your Clients</h3>
+            <h3 className="text-xl font-bold text-crm-text mb-4">Your Clients</h3>
             <DataTable 
               columns={clientColumns} 
               data={assignedClients} 
               searchable={false}
             />
           </div>
-          <LeadsChart />
         </div>
         
         <div className="space-y-6">
           <div className="glass-panel p-6">
-            <h3 className="text-lg font-bold text-white mb-4">Pending Tasks</h3>
+            <h3 className="text-lg font-bold text-crm-text mb-4">Pending Tasks</h3>
             <div className="space-y-3">
               <label className="flex items-start gap-3 p-3 bg-crm-darker/50 rounded-lg cursor-pointer group">
                 <input type="checkbox" className="mt-1 w-4 h-4 rounded border-crm-border text-crm-primary focus:ring-crm-primary focus:ring-offset-crm-darker" />
                 <div>
-                  <p className="text-sm text-white group-hover:text-crm-primary transition-colors">Review ad copy for Stark Industries</p>
+                  <p className="text-sm text-crm-text group-hover:text-crm-primary transition-colors">Review ad copy for Stark Industries</p>
                   <p className="text-xs text-crm-textMuted mt-1">Due today</p>
                 </div>
               </label>
               <label className="flex items-start gap-3 p-3 bg-crm-darker/50 rounded-lg cursor-pointer group">
                 <input type="checkbox" className="mt-1 w-4 h-4 rounded border-crm-border text-crm-primary focus:ring-crm-primary focus:ring-offset-crm-darker" />
                 <div>
-                  <p className="text-sm text-white group-hover:text-crm-primary transition-colors">Send weekly report to Wayne Ent</p>
+                  <p className="text-sm text-crm-text group-hover:text-crm-primary transition-colors">Send weekly report to Wayne Ent</p>
                   <p className="text-xs text-crm-textMuted mt-1">Due tomorrow</p>
                 </div>
               </label>
               <label className="flex items-start gap-3 p-3 bg-crm-darker/50 rounded-lg cursor-pointer group">
                 <input type="checkbox" className="mt-1 w-4 h-4 rounded border-crm-border text-crm-primary focus:ring-crm-primary focus:ring-offset-crm-darker" />
                 <div>
-                  <p className="text-sm text-white group-hover:text-crm-primary transition-colors">Setup new pixel tracking</p>
+                  <p className="text-sm text-crm-text group-hover:text-crm-primary transition-colors">Setup new pixel tracking</p>
                   <p className="text-xs text-crm-textMuted mt-1">Due in 2 days</p>
                 </div>
               </label>
