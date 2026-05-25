@@ -46,9 +46,12 @@ const connectDB = async () => {
       const MetaAdsCampaign = require('../models/MetaAdsCampaign');
       const MetaAdsConnection = require('../models/MetaAdsConnection');
       const MetaAdsLead = require('../models/MetaAdsLead');
+      const SaaSMetaAdsInsight = require('../models/SaaSMetaAdsInsight');
       // await MetaAdsCampaign.sync({ alter: true });
       // await MetaAdsConnection.sync({ alter: true });
       // await MetaAdsLead.sync({ alter: true });
+      await SaaSMetaAdsInsight.sync({ alter: true });
+      console.log('[DB] SaaSMetaAdsInsight table synced with alter:true successfully.');
     } catch (e) {
       console.log('Meta ads sync skipped', e.message);
     }

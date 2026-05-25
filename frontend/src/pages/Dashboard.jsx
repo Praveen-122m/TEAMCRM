@@ -45,7 +45,7 @@ const Dashboard = () => {
       setAnalytics({
         totalSpend: data.totalSpend || 0,
         totalConversions: data.totalConversions || 0,
-        totalClicks: data.totalClicks || 0,
+        totalClicks: data.totalLinkClicks || 0, // Map to link clicks for exact alignment
         roas: data.roas || 0,
       });
       

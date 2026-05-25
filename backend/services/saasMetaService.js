@@ -81,6 +81,7 @@ const seedSimulatedData = async (clientId, days) => {
       // Generate a consistent, account-level follower count for all campaigns on the same day
       const instagram_followers = Math.round(2850 + (days - i) * 12 + Math.random() * 8);
       const purchases = Math.round(link_clicks * (0.018 + Math.random() * 0.01));
+      const purchase_value = parseFloat((purchases * (49 + Math.random() * 50)).toFixed(2));
       const leads = Math.round(link_clicks * (0.045 + Math.random() * 0.015));
       const messaging_conversations_started = Math.round(link_clicks * (0.03 + Math.random() * 0.02));
 
@@ -103,6 +104,7 @@ const seedSimulatedData = async (clientId, days) => {
         landing_page_views,
         instagram_followers,
         purchases,
+        purchase_value,
         leads,
         messaging_conversations_started,
         date: dateStr
@@ -124,6 +126,17 @@ const seedSimulatedData = async (clientId, days) => {
  * Main Sync Service
  */
 const syncHistoricalAndLive = async (clientId, adAccountId, accessToken, days = 180) => {
+  // Check if historical data has already been imported
+  const existingRecordsCount = await SaaSMetaAdsInsight.count({ where: { client_id: clientId } });
+  let finalDays = days;
+  if (existingRecordsCount > 0) {
+    // Limit to incremental window (last 3 days)
+    finalDays = Math.min(days, 3);
+    console.log(`[META_SYNC] Incremental sync active for client ${clientId}: limiting to last ${finalDays} days.`);
+  } else {
+    console.log(`[META_SYNC] Initial historical import active for client ${clientId}: importing last ${finalDays} days.`);
+  }
+
   // If access token is a mock/developer demo token, trigger simulation seeding
   if (
     !accessToken || 
@@ -133,12 +146,12 @@ const syncHistoricalAndLive = async (clientId, adAccountId, accessToken, days = 
     !adAccountId ||
     adAccountId === 'act_123456789'
   ) {
-    return await seedSimulatedData(clientId, days);
+    return await seedSimulatedData(clientId, finalDays);
   }
 
   // Calculate date range
   const sinceDate = new Date();
-  sinceDate.setDate(sinceDate.getDate() - days);
+  sinceDate.setDate(sinceDate.getDate() - finalDays);
   const sinceStr = sinceDate.toISOString().split('T')[0];
   const untilStr = new Date().toISOString().split('T')[0];
 
@@ -151,6 +164,12 @@ const syncHistoricalAndLive = async (clientId, adAccountId, accessToken, days = 
 
   // Fetch daily insights
   const insights = await fetchDailyInsights(accessToken, formattedAdAccountId, sinceStr, untilStr);
+  
+  console.log('====================================================');
+  console.log('[META_SYNC] Raw Meta API Response Insights Payload:');
+  console.log(JSON.stringify(insights, null, 2));
+  console.log('====================================================');
+
   const igFollowerCount = await fetchInstagramFollowers(accessToken) || 2850; // default baseline
 
   let count = 0;
@@ -169,6 +188,7 @@ const syncHistoricalAndLive = async (clientId, adAccountId, accessToken, days = 
       landing_page_views: parsed.landing_page_views,
       instagram_followers: parsed.instagram_followers,
       purchases: parsed.purchases,
+      purchase_value: parsed.purchase_value,
       leads: parsed.leads,
       messaging_conversations_started: parsed.messaging_conversations_started,
       date

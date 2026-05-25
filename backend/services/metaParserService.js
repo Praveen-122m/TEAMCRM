@@ -112,6 +112,7 @@ const parseMetaRecord = (record, igFollowersCount = 0) => {
       landing_page_views: 0,
       instagram_followers: 0,
       purchases: 0,
+      purchase_value: 0,
       leads: 0,
       messaging_conversations_started: 0
     };
@@ -141,6 +142,7 @@ const parseMetaRecord = (record, igFollowersCount = 0) => {
   }
 
   const purchases = getActionValue(actions, ACTION_TYPE_MAP.purchases);
+  const purchase_value = getActionValue(record.action_values || [], ACTION_TYPE_MAP.purchases);
   const leads = getActionValue(actions, ACTION_TYPE_MAP.leads);
   const messaging_conversations_started = getActionValue(actions, ACTION_TYPE_MAP.messaging_conversations_started);
 
@@ -155,6 +157,7 @@ const parseMetaRecord = (record, igFollowersCount = 0) => {
     landing_page_views,
     instagram_followers,
     purchases,
+    purchase_value,
     leads,
     messaging_conversations_started
   };

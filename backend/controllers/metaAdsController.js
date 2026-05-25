@@ -275,6 +275,7 @@ const getAnalytics = async (req, res) => {
     let totalLinkClicks = 0;
     let totalLandingPageViews = 0;
     let totalPurchases = 0;
+    let totalPurchaseValue = 0;
     let totalLeads = 0;
     let totalMessagingConversationsStarted = 0;
     let latestInstagramFollowers = 0;
@@ -288,6 +289,7 @@ const getAnalytics = async (req, res) => {
       totalLinkClicks += parseInt(rec.link_clicks || 0);
       totalLandingPageViews += parseInt(rec.landing_page_views || 0);
       totalPurchases += parseInt(rec.purchases || 0);
+      totalPurchaseValue += parseFloat(rec.purchase_value || 0);
       totalLeads += parseInt(rec.leads || 0);
       totalMessagingConversationsStarted += parseInt(rec.messaging_conversations_started || 0);
       
@@ -298,6 +300,9 @@ const getAnalytics = async (req, res) => {
         latestInstagramFollowers = Math.max(latestInstagramFollowers, parseInt(rec.instagram_followers || 0));
       }
     });
+
+    const totalConversions = totalLeads + totalPurchases;
+    const roas = totalSpend > 0 ? parseFloat((totalPurchaseValue / totalSpend).toFixed(2)) : 0;
 
     // Group daily metrics for the charts
     const dailyMap = {};
@@ -330,6 +335,23 @@ const getAnalytics = async (req, res) => {
 
     const dailyTimeline = Object.values(dailyMap).sort((a, b) => a.date.localeCompare(b.date));
 
+    // Print aggregated totals debug logging
+    console.log('----------------------------------------------------');
+    console.log('[GET_ANALYTICS] Final Aggregated Dashboard Totals:');
+    console.log(`  Total Spend: $${totalSpend.toFixed(2)}`);
+    console.log(`  Total Impressions: ${totalImpressions}`);
+    console.log(`  Total Clicks: ${totalClicks}`);
+    console.log(`  Total Link Clicks: ${totalLinkClicks}`);
+    console.log(`  Total Landing Page Views: ${totalLandingPageViews}`);
+    console.log(`  Total Purchases: ${totalPurchases} (Value: $${totalPurchaseValue.toFixed(2)})`);
+    console.log(`  Total Leads: ${totalLeads}`);
+    console.log(`  Total Conversions: ${totalConversions}`);
+    console.log(`  Aggregate ROAS: ${roas}x`);
+    console.log(`  Total Messaging Conversations Started: ${totalMessagingConversationsStarted}`);
+    console.log(`  Latest Instagram Followers: ${latestInstagramFollowers}`);
+    console.log(`  Daily Timeline Length: ${dailyTimeline.length} days`);
+    console.log('----------------------------------------------------');
+
     res.json({
       totalSpend: parseFloat(totalSpend.toFixed(2)),
       totalImpressions,
@@ -338,7 +360,10 @@ const getAnalytics = async (req, res) => {
       totalLandingPageViews,
       totalInstagramFollowers: latestInstagramFollowers,
       totalPurchases,
+      totalPurchaseValue: parseFloat(totalPurchaseValue.toFixed(2)),
       totalLeads,
+      totalConversions,
+      roas,
       totalMessagingConversationsStarted,
       dailyTimeline
     });

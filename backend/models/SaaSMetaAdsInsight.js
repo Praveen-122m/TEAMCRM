@@ -43,6 +43,10 @@ const SaaSMetaAdsInsight = sequelize.define('SaaSMetaAdsInsight', {
     type: DataTypes.INTEGER,
     defaultValue: 0
   },
+  purchase_value: {
+    type: DataTypes.DECIMAL(10, 2),
+    defaultValue: 0.00
+  },
   leads: {
     type: DataTypes.INTEGER,
     defaultValue: 0
