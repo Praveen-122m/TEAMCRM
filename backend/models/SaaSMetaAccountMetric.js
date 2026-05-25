@@ -1,7 +1,7 @@
 const { DataTypes } = require('sequelize');
 const { sequelize } = require('../config/db');
 
-const SaaSMetaAccount = sequelize.define('SaaSMetaAccount', {
+const SaaSMetaAccountMetric = sequelize.define('SaaSMetaAccountMetric', {
   id: {
     type: DataTypes.UUID,
     defaultValue: DataTypes.UUIDV4,
@@ -11,23 +11,26 @@ const SaaSMetaAccount = sequelize.define('SaaSMetaAccount', {
     type: DataTypes.UUID,
     allowNull: false
   },
-  ad_account_id: {
-    type: DataTypes.STRING,
-    allowNull: false
-  },
-  access_token: {
-    type: DataTypes.TEXT,
-    allowNull: false
-  },
   instagram_followers: {
     type: DataTypes.INTEGER,
     defaultValue: 0
+  },
+  date: {
+    type: DataTypes.DATEONLY,
+    allowNull: false
   }
 }, {
-  tableName: 'meta_accounts',
+  tableName: 'meta_account_metrics',
   timestamps: true,
   createdAt: 'created_at',
-  updatedAt: 'updated_at'
+  updatedAt: 'updated_at',
+  indexes: [
+    {
+      unique: true,
+      fields: ['client_id', 'date'],
+      name: 'unique_client_date'
+    }
+  ]
 });
 
-module.exports = SaaSMetaAccount;
+module.exports = SaaSMetaAccountMetric;

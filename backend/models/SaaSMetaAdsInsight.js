@@ -11,6 +11,10 @@ const SaaSMetaAdsInsight = sequelize.define('SaaSMetaAdsInsight', {
     type: DataTypes.UUID,
     allowNull: false
   },
+  campaign_id: {
+    type: DataTypes.STRING,
+    allowNull: false
+  },
   campaign_name: {
     type: DataTypes.STRING,
     allowNull: false
@@ -32,10 +36,6 @@ const SaaSMetaAdsInsight = sequelize.define('SaaSMetaAdsInsight', {
     defaultValue: 0
   },
   landing_page_views: {
-    type: DataTypes.INTEGER,
-    defaultValue: 0
-  },
-  instagram_followers: {
     type: DataTypes.INTEGER,
     defaultValue: 0
   },
@@ -67,7 +67,7 @@ const SaaSMetaAdsInsight = sequelize.define('SaaSMetaAdsInsight', {
   indexes: [
     {
       unique: true,
-      fields: ['client_id', 'campaign_name', 'date'],
+      fields: ['client_id', 'campaign_id', 'date'],
       name: 'unique_client_campaign_date'
     }
   ]

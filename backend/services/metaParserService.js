@@ -99,10 +99,9 @@ const ACTION_TYPE_MAP = {
 /**
  * Standardizes a single Meta Ads API daily campaign insight record.
  * @param {Object} record Raw campaign insight record from Meta API
- * @param {Number} igFollowersCount Current Instagram followers count (account level)
  * @returns {Object} Normalized metrics object
  */
-const parseMetaRecord = (record, igFollowersCount = 0) => {
+const parseMetaRecord = (record) => {
   if (!record) {
     return {
       spend: 0,
@@ -110,7 +109,6 @@ const parseMetaRecord = (record, igFollowersCount = 0) => {
       clicks: 0,
       link_clicks: 0,
       landing_page_views: 0,
-      instagram_followers: 0,
       purchases: 0,
       purchase_value: 0,
       leads: 0,
@@ -146,16 +144,12 @@ const parseMetaRecord = (record, igFollowersCount = 0) => {
   const leads = getActionValue(actions, ACTION_TYPE_MAP.leads);
   const messaging_conversations_started = getActionValue(actions, ACTION_TYPE_MAP.messaging_conversations_started);
 
-  // Instagram followers count is account-level
-  const instagram_followers = safeNumber(igFollowersCount);
-
   const parsed = {
     spend,
     impressions,
     clicks,
     link_clicks,
     landing_page_views,
-    instagram_followers,
     purchases,
     purchase_value,
     leads,

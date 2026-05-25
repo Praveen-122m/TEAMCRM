@@ -24,6 +24,8 @@ const Report = require('./Report');
 const SaaSClient = require('./SaaSClient');
 const SaaSMetaAccount = require('./SaaSMetaAccount');
 const SaaSMetaAdsInsight = require('./SaaSMetaAdsInsight');
+const SaaSMetaRawInsight = require('./SaaSMetaRawInsight');
+const SaaSMetaAccountMetric = require('./SaaSMetaAccountMetric');
 
 function initAssociations() {
   console.log('[DB] Initializing database model associations...');
@@ -230,6 +232,12 @@ function initAssociations() {
 
   SaaSClient.hasMany(SaaSMetaAdsInsight, { foreignKey: 'client_id', as: 'insights', onDelete: 'CASCADE' });
   SaaSMetaAdsInsight.belongsTo(SaaSClient, { foreignKey: 'client_id', as: 'client' });
+
+  SaaSClient.hasMany(SaaSMetaRawInsight, { foreignKey: 'client_id', as: 'rawInsights', onDelete: 'CASCADE' });
+  SaaSMetaRawInsight.belongsTo(SaaSClient, { foreignKey: 'client_id', as: 'client' });
+
+  SaaSClient.hasMany(SaaSMetaAccountMetric, { foreignKey: 'client_id', as: 'accountMetrics', onDelete: 'CASCADE' });
+  SaaSMetaAccountMetric.belongsTo(SaaSClient, { foreignKey: 'client_id', as: 'client' });
 }
 
 module.exports = initAssociations;

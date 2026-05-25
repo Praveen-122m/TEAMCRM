@@ -57,6 +57,7 @@ app.use('/api/attendance', require('./routes/attendanceRoutes'));
 app.use('/api/projects', require('./routes/projectRoutes'));
 app.use('/api/announcements', require('./routes/announcementRoutes'));
 app.use('/api/meta-ads', require('./routes/metaAdsRoutes'));
+app.use('/api/meta', require('./routes/metaHistoryRoutes'));
 app.use('/api/clients', require('./routes/clientRoutes'));
 app.use('/api/members', require('./routes/memberRoutes'));
 app.use('/api/campaigns', require('./routes/campaignRoutes'));

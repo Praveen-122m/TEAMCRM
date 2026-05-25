@@ -3,6 +3,7 @@ const { connectDB } = require('./config/db');
 const SaaSClient = require('./models/SaaSClient');
 const SaaSMetaAccount = require('./models/SaaSMetaAccount');
 const SaaSMetaAdsInsight = require('./models/SaaSMetaAdsInsight');
+const SaaSMetaRawInsight = require('./models/SaaSMetaRawInsight');
 const encryptionService = require('./services/encryptionService');
 const { syncHistoricalAndLive } = require('./services/saasMetaService');
 
@@ -16,6 +17,7 @@ const test = async () => {
     if (existing) {
       await SaaSMetaAccount.destroy({ where: { client_id: existing.id } });
       await SaaSMetaAdsInsight.destroy({ where: { client_id: existing.id } });
+      await SaaSMetaRawInsight.destroy({ where: { client_id: existing.id } });
       await existing.destroy();
       console.log('Old test client cleaned up.');
     }

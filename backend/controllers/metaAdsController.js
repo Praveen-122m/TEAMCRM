@@ -269,6 +269,12 @@ const getAnalytics = async (req, res) => {
       order: [['date', 'ASC']]
     });
 
+    // Fetch account-level Instagram follower count
+    const metaAccount = await SaaSMetaAccount.findOne({
+      where: { client_id: targetClientId }
+    });
+    const latestInstagramFollowers = metaAccount ? parseInt(metaAccount.instagram_followers || 0) : 0;
+
     let totalSpend = 0;
     let totalImpressions = 0;
     let totalClicks = 0;
@@ -278,9 +284,6 @@ const getAnalytics = async (req, res) => {
     let totalPurchaseValue = 0;
     let totalLeads = 0;
     let totalMessagingConversationsStarted = 0;
-    let latestInstagramFollowers = 0;
-
-    let latestDate = null;
 
     insights.forEach(rec => {
       totalSpend += parseFloat(rec.spend || 0);
@@ -292,13 +295,6 @@ const getAnalytics = async (req, res) => {
       totalPurchaseValue += parseFloat(rec.purchase_value || 0);
       totalLeads += parseInt(rec.leads || 0);
       totalMessagingConversationsStarted += parseInt(rec.messaging_conversations_started || 0);
-      
-      if (!latestDate || rec.date > latestDate) {
-        latestDate = rec.date;
-        latestInstagramFollowers = parseInt(rec.instagram_followers || 0);
-      } else if (rec.date === latestDate) {
-        latestInstagramFollowers = Math.max(latestInstagramFollowers, parseInt(rec.instagram_followers || 0));
-      }
     });
 
     const totalConversions = totalLeads + totalPurchases;
@@ -319,7 +315,7 @@ const getAnalytics = async (req, res) => {
           purchases: 0,
           leads: 0,
           messaging_conversations_started: 0,
-          instagram_followers: 0
+          instagram_followers: latestInstagramFollowers
         };
       }
       dailyMap[d].spend += parseFloat(rec.spend || 0);
@@ -330,7 +326,6 @@ const getAnalytics = async (req, res) => {
       dailyMap[d].purchases += parseInt(rec.purchases || 0);
       dailyMap[d].leads += parseInt(rec.leads || 0);
       dailyMap[d].messaging_conversations_started += parseInt(rec.messaging_conversations_started || 0);
-      dailyMap[d].instagram_followers = Math.max(dailyMap[d].instagram_followers, parseInt(rec.instagram_followers || 0));
     });
 
     const dailyTimeline = Object.values(dailyMap).sort((a, b) => a.date.localeCompare(b.date));
