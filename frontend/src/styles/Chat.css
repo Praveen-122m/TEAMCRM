@@ -1,0 +1,133 @@
+/* Workspace Chat Main Styles */
+
+.chat-container {
+    background-color: #ffffff;
+    border-radius: 16px;
+    overflow: hidden;
+    display: flex;
+    height: 100%;
+}
+
+/* Sidebar Styling */
+.chat-sidebar {
+    width: 320px;
+    border-right: 1px solid #f0f0f0;
+    display: flex;
+    flex-direction: column;
+    background-color: #ffffff;
+}
+
+.chat-tabs {
+    border-bottom: 1px solid #f0f0f0;
+}
+
+.chat-tab-active {
+    color: #5a67d8 !important;
+    font-weight: 700 !important;
+}
+
+.search-container {
+    background-color: #f8f9fa;
+    border-radius: 20px;
+    padding: 8px 16px;
+    display: flex;
+    align-items: center;
+    margin-bottom: 16px;
+}
+
+.search-input {
+    border: none;
+    background: transparent;
+    outline: none;
+    width: 100%;
+    font-size: 0.9rem;
+    color: #4a5568;
+}
+
+/* Channel & Member List */
+.list-item-active {
+    background-color: #ebf4ff !important;
+    color: #5a67d8 !important;
+}
+
+.list-item-text {
+    font-weight: 600 !important;
+}
+
+/* Message Area Styling */
+.message-header {
+    padding: 16px 24px;
+    border-bottom: 1px solid #f0f0f0;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background-color: #ffffff;
+}
+
+.messages-list {
+    flex-grow: 1;
+    padding: 24px;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 24px;
+    background-color: #ffffff;
+}
+
+.message-bubble {
+    display: flex;
+    gap: 16px;
+}
+
+.message-sender-avatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 8px;
+}
+
+.message-sender-name {
+    font-weight: 800;
+    color: #1a202c;
+}
+
+.message-time {
+    font-size: 0.75rem;
+    color: #adb5bd;
+}
+
+.message-content {
+    color: #495057;
+    line-height: 1.5;
+}
+
+/* Input Area */
+.chat-input-container {
+    padding: 16px 24px;
+}
+
+.chat-input-wrapper {
+    background-color: #f8f9fa;
+    border-radius: 12px;
+    padding: 8px 16px;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+}
+
+/* Custom Scrollbar for a Premium Look */
+.messages-list::-webkit-scrollbar {
+    width: 6px;
+}
+
+.messages-list::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+.messages-list::-webkit-scrollbar-thumb {
+    background: #e2e8f0;
+    border-radius: 10px;
+}
+
+.messages-list::-webkit-scrollbar-thumb:hover {
+    background: #cbd5e0;
+}

@@ -1,0 +1,409 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    --color-bg-dark: 10 10 10;      /* True matte black */
+    --color-bg-darker: 0 0 0;       /* Pure black */
+    --color-bg-card: 24 24 27;      /* zinc-900 */
+    --color-primary: 255 255 255;   /* white */
+    --color-primary-hover: 228 228 231; /* zinc-200 */
+    --color-accent: 161 161 170;    /* zinc-400 */
+    --color-border: 39 39 42;       /* zinc-800 */
+    --color-text: 255 255 255;      /* white */
+    --color-text-muted: 161 161 170; /* zinc-400 */
+    --color-primary-text: 0 0 0;    /* black text for white buttons */
+  }
+
+  .light-theme {
+    --color-bg-dark: 250 250 250;   /* near white */
+    --color-bg-darker: 244 244 245; /* zinc-100 */
+    --color-bg-card: 255 255 255;   /* white */
+    --color-primary: 9 9 11;        /* zinc-950 */
+    --color-primary-hover: 39 39 42;  /* zinc-800 */
+    --color-accent: 113 113 122;    /* zinc-500 */
+    --color-border: 228 228 231;    /* zinc-200 */
+    --color-text: 9 9 11;           /* zinc-950 */
+    --color-text-muted: 113 113 122; /* zinc-500 */
+    --color-primary-text: 255 255 255; /* white text for black buttons */
+
+    /* Used internally for elements that must stay dark/white-text in light theme (e.g. modals) */
+    --color-text-light-override: 248 250 252;
+    --color-text-muted-light-override: 186 200 220;
+  }
+
+  body {
+    @apply bg-crm-dark text-crm-text antialiased;
+    font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  }
+}
+
+@layer components {
+  /* Glassmorphism utilities */
+  .glass-panel {
+    @apply bg-crm-card backdrop-blur-xl border border-crm-border shadow-sm rounded-2xl;
+  }
+  
+  .glass-card {
+    @apply bg-crm-card backdrop-blur-md border border-crm-border rounded-xl shadow-sm hover:shadow-md transition-all duration-300;
+  }
+  
+  .glass-input {
+    @apply bg-crm-dark border border-crm-border rounded-lg px-4 py-2 text-crm-text placeholder-crm-textMuted focus:outline-none focus:ring-2 focus:ring-crm-primary focus:border-transparent transition-all duration-200;
+  }
+  
+  .glass-button {
+    @apply bg-crm-primary hover:bg-crm-primaryHover text-crm-primary-text px-4 py-2 rounded-lg font-medium transition-colors duration-200 shadow-sm hover:shadow-glow flex items-center justify-center gap-2;
+  }
+  
+  .glass-button-secondary {
+    @apply bg-crm-darker hover:bg-crm-border border border-crm-border text-crm-text px-4 py-2 rounded-lg font-medium transition-colors duration-200 flex items-center justify-center gap-2;
+  }
+  
+  .glass-button-danger {
+    @apply bg-red-500/20 hover:bg-red-500/40 border border-red-500/50 text-red-400 px-4 py-2 rounded-lg font-medium transition-colors duration-200 flex items-center justify-center gap-2;
+  }
+
+  /* Status badges */
+  .badge-active {
+    @apply bg-emerald-500/10 text-emerald-400 border border-emerald-500/20 px-2 py-1 rounded-full text-xs font-medium;
+  }
+  .badge-inactive {
+    @apply bg-slate-500/10 text-slate-400 border border-slate-500/20 px-2 py-1 rounded-full text-xs font-medium;
+  }
+  .badge-warning {
+    @apply bg-amber-500/10 text-amber-400 border border-amber-500/20 px-2 py-1 rounded-full text-xs font-medium;
+  }
+  .badge-danger {
+    @apply bg-red-500/10 text-red-400 border border-red-500/20 px-2 py-1 rounded-full text-xs font-medium;
+  }
+}
+
+/* Custom Scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  @apply bg-crm-dark;
+}
+
+::-webkit-scrollbar-thumb {
+  @apply bg-crm-border rounded-full;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  @apply bg-crm-textMuted;
+}
+
+/* Modern minimalist scrollbar for chat viewports */
+.custom-scrollbar::-webkit-scrollbar {
+  width: 5px;
+}
+.custom-scrollbar::-webkit-scrollbar-track {
+  background: transparent;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb {
+  @apply bg-crm-border rounded-full bg-opacity-50;
+}
+.custom-scrollbar::-webkit-scrollbar-thumb:hover {
+  @apply bg-crm-textMuted bg-opacity-80;
+}
+.custom-scrollbar {
+  scrollbar-width: thin;
+  scrollbar-color: rgba(71, 85, 105, 0.5) transparent;
+}
+
+/* ── LUXE Login Page ── */
+.login-page {
+  background: #050510;
+}
+
+.login-page-left {
+  background: radial-gradient(ellipse 80% 60% at 20% 50%, rgba(59, 130, 246, 0.08), transparent);
+}
+
+.login-gradient-text {
+  background: linear-gradient(90deg, #a1a1aa 0%, #ffffff 50%, #d4d4d8 100%);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  background-clip: text;
+}
+
+.login-glow {
+  background: radial-gradient(circle at 70% 50%, rgba(255, 255, 255, 0.1), rgba(255, 255, 255, 0.05) 40%, transparent 70%);
+}
+
+.login-card {
+  background: #f7f8fc;
+  border-radius: 2rem;
+  box-shadow:
+    0 25px 80px rgba(0, 0, 0, 0.45),
+    0 0 0 1px rgba(255, 255, 255, 0.08),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.login-role-tabs {
+  display: flex;
+  gap: 0.25rem;
+  padding: 0.35rem;
+  background: #e8eaef;
+  border-radius: 9999px;
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.06);
+}
+
+.login-role-tab-active {
+  background: #ffffff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.08);
+}
+
+.login-label {
+  display: block;
+  font-size: 0.7rem;
+  font-weight: 600;
+  color: #64748b;
+  margin-bottom: 0.5rem;
+  letter-spacing: 0.02em;
+}
+
+.login-input-wrap {
+  position: relative;
+}
+
+.login-input-icon {
+  position: absolute;
+  left: 1rem;
+  top: 50%;
+  transform: translateY(-50%);
+  color: #94a3b8;
+  pointer-events: none;
+}
+
+.login-input {
+  width: 100%;
+  padding: 0.9rem 1rem 0.9rem 2.75rem;
+  font-size: 0.875rem;
+  color: #1e293b;
+  background: #eef0f4;
+  border: none;
+  border-radius: 0.75rem;
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.08);
+  outline: none;
+  transition: box-shadow 0.2s, background 0.2s;
+}
+
+.login-input::placeholder {
+  color: #94a3b8;
+}
+
+.login-input:focus {
+  background: #e8ebf0;
+  box-shadow:
+    inset 0 2px 6px rgba(0, 0, 0, 0.06),
+    0 0 0 2px rgba(59, 130, 246, 0.35);
+}
+
+.login-toggle {
+  width: 2.25rem;
+  height: 1.25rem;
+  border-radius: 9999px;
+  background: #cbd5e1;
+  position: relative;
+  transition: background 0.2s;
+  flex-shrink: 0;
+}
+
+.login-toggle-on {
+  background: #18181b;
+}
+
+.login-toggle-knob {
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  width: 1rem;
+  height: 1rem;
+  border-radius: 50%;
+  background: white;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.2);
+  transition: transform 0.2s;
+}
+
+.login-toggle-on .login-toggle-knob {
+  transform: translateX(1rem);
+}
+
+.login-submit {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  padding: 1rem 1.5rem;
+  background: #e8eaef;
+  border: none;
+  border-radius: 0.75rem;
+  box-shadow:
+    0 4px 14px rgba(0, 0, 0, 0.06),
+    inset 0 1px 0 rgba(255, 255, 255, 0.8);
+  cursor: pointer;
+  transition: transform 0.15s, box-shadow 0.15s;
+}
+
+.login-submit:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow:
+    0 8px 24px rgba(59, 130, 246, 0.2),
+    inset 0 1px 0 rgba(255, 255, 255, 0.9);
+}
+
+.login-submit:active:not(:disabled) {
+  transform: translateY(0);
+}
+
+/* ── Register Page (centered Silk-style card) ── */
+.register-page {
+  min-height: 100vh;
+  background: radial-gradient(circle at 50% 30%, #18181b 0%, #09090b 55%, #000000 100%);
+}
+
+.register-hero-glow {
+  background: radial-gradient(
+    circle at 50% 40%,
+    rgba(255, 255, 255, 0.12) 0%,
+    rgba(255, 255, 255, 0.05) 25%,
+    transparent 55%
+  );
+}
+
+.register-card {
+  background: #f3f4f8;
+  border-radius: 1.75rem;
+  box-shadow:
+    0 0 60px rgba(255, 255, 255, 0.35),
+    0 0 120px rgba(147, 197, 253, 0.15),
+    0 25px 80px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(255, 255, 255, 0.95);
+}
+
+.register-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 1rem 1.25rem;
+}
+
+@media (max-width: 540px) {
+  .register-grid {
+    grid-template-columns: 1fr;
+  }
+}
+
+.register-label-upper {
+  display: block;
+  font-size: 0.65rem;
+  font-weight: 700;
+  color: #64748b;
+  margin-bottom: 0.45rem;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.register-input-plain {
+  width: 100%;
+  padding: 0.85rem 1rem;
+  font-size: 0.875rem;
+  color: #1e293b;
+  background: #eef0f4;
+  border: none;
+  border-radius: 0.75rem;
+  box-shadow: inset 0 2px 6px rgba(0, 0, 0, 0.08);
+  outline: none;
+  transition: box-shadow 0.2s, background 0.2s;
+}
+
+.register-input-plain::placeholder {
+  color: #94a3b8;
+}
+
+.register-input-plain:focus {
+  background: #e8ebf0;
+  box-shadow:
+    inset 0 2px 6px rgba(0, 0, 0, 0.06),
+    0 0 0 2px rgba(59, 130, 246, 0.35);
+}
+
+.register-checkbox {
+  width: 1rem;
+  height: 1rem;
+  accent-color: #3b82f6;
+  cursor: pointer;
+}
+
+/* Global Light Theme Text Visibility Fixes */
+.light-theme .text-white:not(.dark-modal):not(.dark-modal *):not(.login-page *):not(.register-page *):not(.glass-button):not(.glass-button *):not(.bg-crm-primary):not(.bg-crm-primary *):not(.bg-crm-accent):not(.bg-crm-accent *):not([class*="bg-violet"]):not([class*="bg-violet"] *):not([class*="bg-indigo"]):not([class*="bg-indigo"] *):not([class*="bg-emerald"]):not([class*="bg-emerald"] *):not([class*="bg-rose"]):not([class*="bg-rose"] *):not([class*="from-crm-"]):not([class*="from-crm-"] *) {
+  color: rgb(var(--color-text)) !important;
+}
+
+/* Specific elements style overrides inside light theme */
+.light-theme .dark-modal,
+.light-theme .dark-modal * {
+  --color-text: var(--color-text-light-override) !important;
+  --color-text-muted: var(--color-text-muted-light-override) !important;
+}
+
+.light-theme .text-rose-300 {
+  color: rgb(225 29 72) !important; /* rose-600 */
+}
+.light-theme .text-amber-300 {
+  color: rgb(217 119 6) !important; /* amber-600 */
+}
+.light-theme .text-indigo-300 {
+  color: rgb(79 70 229) !important; /* indigo-600 */
+}
+
+/* Status badges contrast overrides in light-theme */
+.light-theme .badge-active {
+  color: rgb(5 150 105) !important; /* emerald-600 */
+  background-color: rgba(16 185 129 / 0.1) !important;
+  border-color: rgba(16 185 129 / 0.2) !important;
+}
+.light-theme .badge-inactive {
+  color: rgb(71 85 105) !important; /* slate-600 */
+  background-color: rgba(100 116 139 / 0.1) !important;
+  border-color: rgba(100 116 139 / 0.2) !important;
+}
+.light-theme .badge-warning {
+  color: rgb(217 119 6) !important; /* amber-600 */
+  background-color: rgba(245 158 11 / 0.1) !important;
+  border-color: rgba(245 158 11 / 0.2) !important;
+}
+.light-theme .badge-danger {
+  color: rgb(220 38 38) !important; /* red-600 */
+  background-color: rgba(239 68 68 / 0.1) !important;
+  border-color: rgba(239 68 68 / 0.2) !important;
+}
+
+/* ── View Transitions API Theme Toggle Animation ── */
+::view-transition-group(root) {
+  animation-duration: 0.5s;
+}
+
+::view-transition-old(root) {
+  z-index: 1;
+}
+
+::view-transition-new(root) {
+  z-index: 2;
+  clip-path: circle(0% at var(--x, 50%) var(--y, 50%));
+  animation: reveal 0.5s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+
+@keyframes reveal {
+  from {
+    clip-path: circle(0% at var(--x, 50%) var(--y, 50%));
+  }
+  to {
+    clip-path: circle(150% at var(--x, 50%) var(--y, 50%));
+  }
+}

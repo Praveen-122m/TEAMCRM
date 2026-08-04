@@ -1,0 +1,11 @@
+node_modules/
+node_modules/
+.env
+database.sqlite
+uploads/
+*.log
+.vscode/
+.idea/
+f i r e b a s e - s e r v i c e - a c c o u n t . j s o n  
+teamcrm-*.json
+*.json
