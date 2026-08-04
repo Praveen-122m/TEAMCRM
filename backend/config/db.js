@@ -35,6 +35,24 @@ const sequelize = isSqlite
 
 const connectDB = async () => {
   try {
+    if (!isSqlite) {
+      try {
+        const mysql = require('mysql2/promise');
+        const dbName = process.env.DB_NAME || 'team_chat';
+        const conn = await mysql.createConnection({
+          host: process.env.DB_HOST || '127.0.0.1',
+          port: process.env.DB_PORT || 3306,
+          user: process.env.DB_USER || 'root',
+          password: process.env.DB_PASS || ''
+        });
+        await conn.query(`CREATE DATABASE IF NOT EXISTS \`${dbName}\`;`);
+        await conn.end();
+        console.log(`[DB] Database '${dbName}' verified/created.`);
+      } catch (err) {
+        console.warn('[DB] Auto-create database skipped/handled:', err.message);
+      }
+    }
+
     await sequelize.authenticate();
     console.log('[DB] SQL Database connection established successfully.');
 
