@@ -1,9 +1,0 @@
-{
-  "name": "teamcrm-root",
-  "version": "1.0.0",
-  "private": true,
-  "scripts": {
-    "build": "npm --prefix backend install",
-    "start": "node backend/server.js"
-  }
-}
