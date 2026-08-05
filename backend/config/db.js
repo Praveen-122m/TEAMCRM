@@ -1,6 +1,6 @@
 const { Sequelize } = require('sequelize');
 
-const isSqlite = process.env.DB_DIALECT === 'sqlite';
+const isSqlite = process.env.DB_DIALECT === 'sqlite' || (!process.env.DB_HOST && process.env.NODE_ENV === 'production');
 
 const sequelize = isSqlite
   ? new Sequelize({
