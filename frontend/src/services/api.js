@@ -8,8 +8,16 @@ const clearTabAuth = () => {
   sessionStorage.removeItem('activeWorkspace');
 };
 
+const getApiBaseUrl = () => {
+  if (import.meta.env.VITE_API_URL) return import.meta.env.VITE_API_URL;
+  if (typeof window !== 'undefined' && window.location.hostname !== 'localhost' && window.location.hostname !== '127.0.0.1') {
+    return 'https://teamcrmbackend.onrender.com/api';
+  }
+  return '/api';
+};
+
 const api = axios.create({
-  baseURL: import.meta.env.VITE_API_URL || '/api',
+  baseURL: getApiBaseUrl(),
 });
 
 api.interceptors.request.use(
@@ -69,7 +77,7 @@ api.interceptors.response.use(
 
       try {
         const res = await axios.post(
-          (import.meta.env.VITE_API_URL || '/api') + '/auth/refresh',
+          getApiBaseUrl() + '/auth/refresh',
           {},
           { withCredentials: true }
         );
