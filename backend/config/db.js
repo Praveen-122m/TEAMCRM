@@ -19,10 +19,12 @@ const sequelize = isSqlite
         logging: false,
         timezone: '+05:30', // For Indian Standard Time (IST)
         dialectOptions: {
-          // Ensuring it reads DB timestamps correctly
           dateStrings: true,
           typeCast: true,
-          timezone: '+05:30'
+          timezone: '+05:30',
+          ssl: (process.env.DB_SSL === 'true' || process.env.DB_HOST?.includes('aiven') || process.env.DB_HOST?.includes('aivencloud.com')) ? {
+            rejectUnauthorized: false
+          } : undefined
         },
         pool: {
           max: 50,
@@ -39,11 +41,13 @@ const connectDB = async () => {
       try {
         const mysql = require('mysql2/promise');
         const dbName = process.env.DB_NAME || 'team_chat';
+        const isCloudDb = process.env.DB_SSL === 'true' || process.env.DB_HOST?.includes('aiven') || process.env.DB_HOST?.includes('aivencloud.com');
         const conn = await mysql.createConnection({
           host: process.env.DB_HOST || '127.0.0.1',
           port: process.env.DB_PORT || 3306,
           user: process.env.DB_USER || 'root',
-          password: process.env.DB_PASS || ''
+          password: process.env.DB_PASS || '',
+          ssl: isCloudDb ? { rejectUnauthorized: false } : undefined
         });
         await conn.query(`CREATE DATABASE IF NOT EXISTS \`${dbName}\`;`);
         await conn.end();
