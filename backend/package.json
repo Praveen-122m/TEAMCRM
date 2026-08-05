@@ -4,7 +4,7 @@
   "main": "index.js",
   "scripts": {
     "start": "node server.js",
-    "build": "npm install && npm rebuild sqlite3",
+    "build": "npm install --build-from-source sqlite3",
     "dev": "nodemon server.js",
     "check-users": "node check_users.js"
   },
