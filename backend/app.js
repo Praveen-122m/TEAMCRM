@@ -17,9 +17,12 @@ app.use(cookieParser());
 
 // ── CORS Configuration ──
 app.use(cors({
-  origin: [process.env.FRONTEND_URL, /^http:\/\/localhost:\d+$/].filter(Boolean),
-  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH'],
-  allowedHeaders: ['Content-Type', 'Authorization'],
+  origin: (origin, callback) => {
+    // Allow requests with no origin (mobile apps, server-to-server) or any frontend origin
+    callback(null, origin || true);
+  },
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'PATCH', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization', 'X-Requested-With', 'Accept', 'Origin'],
   credentials: true
 }));
 

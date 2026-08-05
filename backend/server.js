@@ -23,7 +23,7 @@ const server = http.createServer(app);
 const io = new Server(server, {
   path: '/api/socket.io',
   cors: {
-    origin: [process.env.FRONTEND_URL, /^http:\/\/localhost:\d+$/].filter(Boolean),
+    origin: (origin, callback) => callback(null, origin || true),
     methods: ['GET', 'POST', 'PUT', 'DELETE'],
     credentials: true
   },
