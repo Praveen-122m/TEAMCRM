@@ -275,8 +275,11 @@ const connectDB = async () => {
     }
 
   } catch (error) {
-    console.error('🔥 FATAL ERROR: Unable to connect to MySQL database:', error.message);
-    process.exit(1); // Force server to stop if DB is not connected!
+    console.error('⚠️ DB connection error:', error.message);
+    if (!isSqlite) {
+      console.log('🔄 MySQL unavailable. Automatically falling back to SQLite storage...');
+      process.env.DB_DIALECT = 'sqlite';
+    }
   }
 };
 
